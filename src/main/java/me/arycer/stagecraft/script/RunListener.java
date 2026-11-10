@@ -17,4 +17,7 @@ public interface RunListener {
 
     /** The script raised a signal ({@code stage.signal}); the director relays it to the other clients. */
     default void signal(String name) {}
+
+    /** The script asks the director for something only it can do (e.g. {@code restart_server}); it answers by id. */
+    default void director(String id, String action) {}
 }

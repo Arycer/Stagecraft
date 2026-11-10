@@ -39,6 +39,7 @@ public final class ScriptContext {
     private final RunListener listener;
     private final HostChannel host;
     private final Signals signals;
+    private final Connection connection;
     private final String runId;
     private final long started = System.nanoTime();
     /** Messages up to this sequence are not matched by the next expectation. */
@@ -49,7 +50,7 @@ public final class ScriptContext {
 
     ScriptContext(MinecraftClient client, Origin origin, Map<String, String> args, RunReport report, RunLog log,
                   ChatLog chat, BooleanSupplier cancelled, RunListener listener, String runId,
-                  HostChannel host, Signals signals) {
+                  HostChannel host, Signals signals, Connection connection) {
         this.client = client;
         this.origin = origin;
         this.args = Map.copyOf(args);
@@ -60,6 +61,7 @@ public final class ScriptContext {
         this.listener = listener;
         this.host = host;
         this.signals = signals;
+        this.connection = connection;
         this.runId = runId;
         this.cursor = chat.mark();
     }
@@ -73,6 +75,13 @@ public final class ScriptContext {
     public String runId() { return runId; }
     public HostChannel host() { return host; }
     public Signals signals() { return signals; }
+    public Connection connection() { return connection; }
+
+    /** Sends a request to the director (answered through {@link Connection#reply}). */
+    public void director(String id, String action) {
+        trace("director " + action + " " + id);
+        listener.director(id, action);
+    }
 
     /** Raises a signal here and announces it (the director relays it to the other clients). */
     public void signal(String name) {

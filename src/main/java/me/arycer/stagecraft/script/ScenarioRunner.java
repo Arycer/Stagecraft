@@ -5,6 +5,7 @@ import me.arycer.stagecraft.placement.Origin;
 import me.arycer.stagecraft.report.RunLog;
 import me.arycer.stagecraft.report.RunReport;
 import me.arycer.stagecraft.script.api.ChatModule;
+import me.arycer.stagecraft.script.api.ConnectionModule;
 import me.arycer.stagecraft.script.api.CoreModule;
 import me.arycer.stagecraft.script.api.GuiModule;
 import me.arycer.stagecraft.script.api.HostModule;
@@ -33,7 +34,7 @@ import java.util.function.Consumer;
  */
 public final class ScenarioRunner {
     private static final List<StageModule> MODULES = List.of(
-            new CoreModule(), new ChatModule(), new WorldModule(), new PlayerModule(), new GuiModule(), new HostModule(), new SignalModule(), new InstancedModule());
+            new CoreModule(), new ChatModule(), new WorldModule(), new PlayerModule(), new GuiModule(), new HostModule(), new SignalModule(), new ConnectionModule(), new InstancedModule());
 
     private final MinecraftClient client;
     private final Path scripts;
@@ -44,6 +45,7 @@ public final class ScenarioRunner {
     private volatile boolean cancelled;
     private volatile RunReport lastReport;
     private final Signals signals = new Signals();
+    private final Connection connection = new Connection();
     private volatile HostChannel host = HostChannel.NONE;
     private final List<RunListener> listeners = new CopyOnWriteArrayList<>();
     private static final int MAX_SOURCE_BYTES = 1_000_000;
@@ -124,6 +126,15 @@ public final class ScenarioRunner {
         signals.raise(name);
     }
 
+    /** The client left its server: cancels the run unless the disconnect was expected (see {@link Connection}). */
+    public void disconnected() {
+        if (!connection.expectingDisconnect()) cancel();
+    }
+
+    public Connection connection() {
+        return connection;
+    }
+
     public void addListener(RunListener listener) {
         listeners.add(listener);
     }
@@ -141,7 +152,8 @@ public final class ScenarioRunner {
         String runId = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         cancelled = false;
         ScriptContext context = new ScriptContext(client, origin, args, report,
-                new RunLog(base.resolveSibling(base.getFileName() + ".log")), chat, () -> cancelled, events, runId, host, signals);
+                new RunLog(base.resolveSibling(base.getFileName() + ".log")), chat, () -> cancelled, events, runId, host, signals, connection);
+        connection.expectDisconnect(false);
         signals.clear();
         current = context;
         status = "running " + name;
@@ -181,6 +193,7 @@ public final class ScenarioRunner {
         @Override public void step(String name, RunReport.Status status, String error) { each(l -> l.step(name, status, error)); }
         @Override public void finished(RunReport report) { each(l -> l.finished(report)); }
         @Override public void signal(String name) { each(l -> l.signal(name)); }
+        @Override public void director(String id, String action) { each(l -> l.director(id, action)); }
 
         private void each(Consumer<RunListener> call) {
             for (RunListener listener : listeners) {

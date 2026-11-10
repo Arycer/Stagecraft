@@ -38,7 +38,10 @@ public final class StagecraftClient implements ClientModInitializer {
         Optional<Link> link = Link.start(client, runner, client.runDirectory.toPath().resolve("config/stagecraft"));
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> received(runner, link, message));
         ClientReceiveMessageEvents.CHAT.register((message, signed, sender, params, timestamp) -> received(runner, link, message));
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, disconnected) -> runner.cancel());
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, joined) -> {
+            if (joined.getCurrentServerEntry() != null) runner.connection().joined(joined.getCurrentServerEntry().address);
+        });
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, disconnected) -> runner.disconnected());
         WindowPlacement.install();
         ClientLifecycleEvents.CLIENT_STOPPING.register(stopping -> {
             runner.cancel();

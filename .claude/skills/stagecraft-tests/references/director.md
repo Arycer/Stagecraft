@@ -96,3 +96,9 @@ Protocol (JSON, request `{id, type, …}` → `{id, type: 'reply' | 'error'}`):
 
 Events to every connection `{type: 'event', event, run_id, …}`: `started` (scenario), `log` (text), `step`
 (name, status, error), `signal` (name), `finished` (status, error, report), `chat` (text, keys: `[{key, args}]`).
+
+## Suites, libraries and server restarts
+
+`run a.lua b.lua ...` runs scenarios sequentially on the same roles; exit code 0 requires all to pass. Group suites by their required roles. A `lib/` next to the scenario (or its parent for drafts) is copied to each client's `scripts/lib/` before running.
+
+`--server-start "gradlew.bat :fabric-server:runServer --console=plain" --server-cwd <Instanced>` enables `stage.restart_server()`. `--server-log <path>` selects the new process log. `--server-dir <path>` selects the server data directory (default `<server-cwd>/fabric-server/run`). The server must already be up at the first connection. The director waits for the port to close, then for process exit. On Windows a hung KnotServer is terminated only after its own new log confirms **All dimensions are saved**, with the captured listening PID and creation timestamp checked again. It never kills all Java processes. The server is started hidden and every role reconnects before the script resumes.

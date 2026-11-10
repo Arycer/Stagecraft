@@ -103,3 +103,9 @@ Instanced's admin protocol (permission-checked by Instanced). Only when Instance
 `require('a.b')` loads `scripts/lib/a/b.lua` once per run and returns its value. In director runs the source is
 sent inline but `require` still reads the *client's* `scripts/lib/`, so prefer self-contained scenarios or copy
 the libraries into the clients' `config/stagecraft/scripts/lib/`.
+
+## Connections and restarts
+
+`stage.connected()` returns whether the client is in a world. `stage.disconnect()` leaves intentionally without cancelling the run. `stage.connect([host, port])` joins (by default the last server) and waits for the world. Unexpected disconnects still cancel the scenario.
+
+`stage.restart_server(seconds=300)` asks the director to prepare, stops the server through the host, waits for the director to restart it and reconnect every role. Requires `--server-start`, host permissions, and a local test server. `stage.mods()` returns loaded client mod IDs mapped to their versions.

@@ -85,6 +85,15 @@ public final class LinkProtocol implements RunListener {
                     yield new JsonObject();
                 }
                 case "connect" -> connect(message);
+                case "expect_disconnect" -> {
+                    runner.connection().expectDisconnect(message.get("on").getAsBoolean());
+                    yield new JsonObject();
+                }
+                case "director_reply" -> {
+                    runner.connection().reply(message.get("request").getAsString(), message.get("phase").getAsString(),
+                            message.has("error") ? message.get("error").getAsString() : null);
+                    yield new JsonObject();
+                }
                 case "disconnect" -> onClient(() -> {
                     if (client.world != null) client.disconnect();
                     return new JsonObject();
@@ -249,6 +258,14 @@ public final class LinkProtocol implements RunListener {
         event.add("status", json.get("status"));
         if (json.has("error")) event.add("error", json.get("error"));
         event.add("report", json);
+        broadcast(event);
+    }
+
+    @Override
+    public void director(String id, String action) {
+        JsonObject event = event("director");
+        event.addProperty("id", id);
+        event.addProperty("action", action);
         broadcast(event);
     }
 

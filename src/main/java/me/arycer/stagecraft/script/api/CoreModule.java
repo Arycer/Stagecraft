@@ -4,6 +4,8 @@ import me.arycer.stagecraft.placement.Origin;
 import me.arycer.stagecraft.report.RunReport;
 import me.arycer.stagecraft.script.Failures;
 import me.arycer.stagecraft.script.ScriptContext;
+import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.ModContainer;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
@@ -51,6 +53,14 @@ public final class CoreModule implements StageModule {
             return LuaValue.NIL;
         }));
         stage.set("step", function(a -> step(context, a)));
+        stage.set("mods", function(a -> {
+            // Mod id → version of everything Fabric Loader loaded on this client.
+            LuaTable mods = new LuaTable();
+            for (ModContainer mod : FabricLoader.getInstance().getAllMods()) {
+                mods.set(mod.getMetadata().getId(), mod.getMetadata().getVersion().getFriendlyString());
+            }
+            return mods;
+        }));
     }
 
     private static Varargs step(ScriptContext context, Varargs a) {

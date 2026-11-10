@@ -47,8 +47,7 @@ Also check, in every draft:
   translation keys.
 - **Implicit ordering between clients**: the generated `order_N` signals keep the recorded order; replace them
   with named signals at the real synchronisation points (see `scenarios/instanced/tpa.lua`).
-- **Server restarts** (`restart`, `rejoin`, `dimensions`/`slots` modes): the director can't restart the server
-  yet — leave those on the old script.
+- **Server restarts** (`restart`, `rejoin`, `dimensions`/`slots` modes): use `stage.restart_server()` with the director's `--server-start` and merge both phases into one scenario.
 
 ## 3. Verify and retire
 
