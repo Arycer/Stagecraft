@@ -1,0 +1,32 @@
+local I,G=require('instanced'),require('gui')
+local ns='capture_'..stage.run_id
+local function open() G.open('20 120 20'); stage.wait_text('^Bloque de captura$') end
+local ok,failure=pcall(function()
+  stage.step('construir sala y bloque de captura',function()
+    stage.command('gamemode creative'); I.tp_to('minecraft:overworld',20.5,120,16.5); stage.fly(true)
+    stage.command('fill 20 120 20 34 130 34 minecraft:air')
+    stage.command('fill 22 120 22 26 122 26 minecraft:stone_bricks hollow')
+    stage.command('setblock 24 121 24 instanced:start_point[facing=south]'); stage.command('setblock 20 120 20 instanced:capture')
+  end)
+  stage.step('ajustar al contenido, elegir ruta y capturar schematic',function()
+    open(); stage.click_text('^Ajustar al contenido$'); stage.wait_text('^Caja ajustada al contenido: 5×3×5\\.$')
+    G.path(ns..'/room')
+    stage.click_text('^Capturar$'); stage.expect_chat('Capturado schematics/'..ns..'/room\\.schem · 5×3×5',15)
+    local nbt=stage.host('nbt.read',{path=I.CONFIG..'schematics/'..ns..'/room.schem'}).snbt
+    assert(nbt:find('minecraft:stone_bricks',1,true) and nbt:find('instanced:start_point',1,true),'paleta incorrecta')
+  end)
+  stage.step('capturar otra vez reemplaza el fichero',function()
+    open(); stage.click_text('^Capturar$'); stage.expect_chat('Reemplazado schematics/'..ns..'/room\\.schem',15)
+  end)
+  stage.step('templates avisa del punto de inicio',function()
+    open(); stage.click_text('^Templates$'); G.path(ns..'/room_asset')
+    stage.click_text('^Capturar$')
+    stage.expect_all({'Capturado templates/'..ns..'/room_asset\\.nbt','los templates no pueden tener instanced:start_point'},15)
+  end)
+end)
+if not ok then pcall(G.dump) end
+I.cleanup(function()
+  stage.command('execute in minecraft:overworld run fill 20 120 20 34 130 34 minecraft:air')
+  I.delete_namespace(ns)
+end)
+if not ok then error(failure,0) end

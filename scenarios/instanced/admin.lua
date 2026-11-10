@@ -1,0 +1,72 @@
+local I,G=require('instanced'),require('gui')
+local ns='admin_'..stage.run_id
+local level=ns..':gui'
+local global=I.CONFIG..'instanced.json'
+local original=stage.host('file.read',{path=global}).text
+local cap=tonumber(original:match('"instances_per_hour"%s*:%s*(%d+)') or '10')
+local function exists(path) assert(stage.host('file.exists',{path=I.CONFIG..path}).exists,'missing '..path) end
+local ok,failure=pcall(function()
+  stage.step('abrir administración',function()
+    stage.command('gamemode creative'); I.cleanup(); I.resetcap(); G.admin(); stage.wait_text('^Elige un nivel de la lista')
+  end)
+  stage.step('crear carpeta y subir schematic desde el cliente',function()
+    assert(stage.args.fixture_dir,'director must copy fixtures/')
+    G.tab(2); stage.click_text('^Nueva carpeta$'); G.prompt(ns); stage.wait_text('^'..ns..'$')
+    stage.click_text('^Subir…$'); G.prompt(stage.args.fixture_dir..'/gui.nbt')
+    stage.wait_text('Subido '..ns..'/gui\\.nbt',20); stage.wait_text('^gui\\.nbt$'); exists('schematics/'..ns..'/gui.nbt')
+  end)
+  stage.step('menú contextual y renombrar fichero',function()
+    stage.click_text('^gui\\.nbt$',{button=1}); stage.wait_text('^Borrar$'); stage.key('escape')
+    stage.click_text('^gui\\.nbt$'); stage.click_text('^Renombrar o mover$'); G.prompt(ns..'/crypt.nbt')
+    stage.wait_text('^crypt\\.nbt$'); exists('schematics/'..ns..'/crypt.nbt')
+  end)
+  stage.step('subir template a carpeta propia',function()
+    stage.click_text('^Templates$'); stage.click_text('^Nueva carpeta$'); G.prompt(ns)
+    stage.click_text('^Subir…$'); G.prompt(stage.args.fixture_dir..'/side.nbt'); stage.wait_text('Subido '..ns..'/side\\.nbt',20)
+  end)
+  stage.step('crear pool y elegir template desde la lista',function()
+    stage.click_text('^Pools$'); stage.click_text('^Nueva pool$'); G.prompt(ns..'/pool.json')
+    stage.wait_text('Pool nueva: se creará al guardar'); stage.click_text('^Elegir…$')
+    stage.click_text('^'..ns..'$'); stage.click_text('^side\\.nbt$'); stage.click_text('^Usar$')
+    G.field('templates/'..ns..'/side.nbt'); stage.click_text('^Validar$'); stage.wait_text('^La pool es válida\\.$')
+    stage.click_text('^Guardar pool$'); stage.wait_text('^Pool guardada\\.')
+    local saved=stage.host('file.read',{path=I.CONFIG..'pools/'..ns..'/pool.json'}).text
+    assert(saved:find('templates/'..ns..'/side.nbt',1,true),'template incorrecto')
+  end)
+  stage.step('crear nivel eligiendo el schematic',function()
+    G.tab(1); stage.click_text('^Nuevo nivel$'); stage.set_field(G.field('Nuevo nivel'),'Nivel GUI Lua')
+    local label=stage.wait_text('^Id$'); local id
+    for n,w in ipairs(G.fields()) do
+      if w.value=='' and math.abs(w.y-label.y)<10 and math.abs(w.x-(label.x+22))<=4 then id=n end
+    end
+    stage.set_field(assert(id,'campo Id no encontrado'),level)
+    stage.click_text('^Elegir…$'); stage.click_text('^'..ns..'$'); stage.click_text('^crypt\\.nbt$'); stage.click_text('^Usar$')
+    G.field('schematics/'..ns..'/crypt.nbt'); stage.click_text('^Validar$'); stage.wait_text('El nivel es válido')
+    stage.click_text('^Guardar y aplicar$'); stage.wait_text('Guardado\\. Niveles: \\d+ válidos')
+  end)
+  stage.step('pregenerar y jugar sin reiniciar',function()
+    G.tab(1); stage.click_text('^Nivel GUI Lua$'); stage.wait_text('^dimensión loaded$',60)
+    stage.click_text('^Pregenerar$'); stage.wait_text('^1 listos$',60); stage.close()
+    stage.command('execute in minecraft:overworld run fill 4 100 0 4 101 0 minecraft:air')
+    stage.command('execute in minecraft:overworld run setblock 4 100 0 instanced:entrance_portal{Level:"'..level..'",Exit:{Dimension:"minecraft:overworld",Pos:[0.5d,100.0d,0.5d],Yaw:0f,Pitch:0f}}')
+    stage.command('tp @s 4.5 100 0.5'); stage.expect_chat('Entras en Nivel GUI Lua',15)
+    I.wait_dimension('instanced:level/'..ns..'/gui'); stage.wait(1); assert(#I.ids(level)==1); I.cleanup()
+  end)
+  stage.step('ajustes: guardar configuración global',function()
+    G.admin(); G.tab(7); stage.wait_text('^Instancias por hora$')
+    stage.set_field(G.field(tostring(cap)),tostring(cap+7)); stage.click_text('^Guardar y aplicar$'); stage.wait_text('^Configuración guardada\\.')
+    local text=stage.host('file.read',{path=global}).text
+    assert(tonumber(text:match('"instances_per_hour"%s*:%s*(%d+)'))==cap+7,'config no guardada')
+  end)
+  stage.step('borrar schematic en uso avisa del nivel',function()
+    G.tab(2); stage.click_text('^Schematics$'); stage.click_text('^'..ns..'$'); stage.click_text('^crypt\\.nbt$'); stage.click_text('^Borrar$')
+    stage.wait_text('Lo usan: nivel'); stage.wait_text(level); stage.click_text('^Confirmar$'); stage.wait_text('^Borrado '..ns..'/crypt\\.nbt\\.')
+    assert(not stage.host('file.exists',{path=I.CONFIG..'schematics/'..ns..'/crypt.nbt'}).exists)
+  end)
+end)
+if not ok then pcall(G.dump) end
+I.cleanup(function()
+  I.delete_namespace(ns); stage.host('file.write',{path=global,text=original}); I.reload()
+  stage.command('execute in minecraft:overworld run fill 4 100 0 4 101 0 minecraft:air')
+end)
+if not ok then error(failure,0) end

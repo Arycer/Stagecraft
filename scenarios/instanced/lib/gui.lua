@@ -37,4 +37,8 @@ function G.path(value)
   if folder then stage.click_text('^Nueva carpeta$|^New folder$'); G.prompt(folder); stage.wait_text('/'..folder..'/$') end
   G.last(name:gsub('%.nbt$',''):gsub('%.schem$','')); stage.key('enter'); stage.wait(0.5)
 end
+function G.dump()
+  for _,t in ipairs(stage.texts()) do stage.log('screen: '..t.text) end
+  for n,w in ipairs(G.fields()) do stage.log('field '..n..': '..w.value) end
+end
 return G

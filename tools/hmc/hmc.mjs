@@ -41,6 +41,8 @@ function options({ lang, windowed }) {
         `lang:${lang ?? process.env.HMC_LANG ?? 'es_es'}`,
         'pauseOnLostFocus:false', 'onboardAccessibility:false', 'narrator:0', 'renderDistance:4', 'simulationDistance:5',
         'skipMultiplayerWarning:true', 'joinedFirstServer:true', 'tutorialStep:none',
+        // Stable test viewport: auto scale makes an 854 px headless window only 427 GUI pixels wide.
+        windowed ? 'guiScale:2' : 'guiScale:1',
         windowed ? 'soundCategory_master:0.2' : 'soundCategory_master:0.0',
     ];
     if (windowed) lines.push('fullscreen:false');
@@ -129,7 +131,9 @@ export function startClient(name, { windowed = false, window, label, mods = [], 
             '-Dhmc.assets.dummy=true',
             '-Dhmc.check.xvfb=false',
             '-jar', LAUNCHER, '--command', `launch ${VERSION} -lwjgl --offline`,
-        ], { cwd: HOME, stdio: ['pipe', 'pipe', 'pipe'], env: gameEnv })));
+        // Each launcher owns its temporary patched jars/natives. A shared cwd lets another launcher's
+        // cleanup remove these while an existing client is loading them (MemoryUtil NoClassDefFoundError).
+        ], { cwd: dir, stdio: ['pipe', 'pipe', 'pipe'], env: gameEnv })));
     launched.catch(error => lines.push(`[hmc] launch failed: ${error.message}`));
 
     /** The client's Stagecraft link (windowed clients are driven through it). */
@@ -154,11 +158,13 @@ export function startClient(name, { windowed = false, window, label, mods = [], 
             if (windowed) throw new Error(`${name} is windowed: there is no hmc-specifics console, use the link`);
             java.stdin.write(`${command}\n`);
         },
-        async waitFor(pattern, { timeout = 60_000, since = lines.length } = {}) {
+        async waitFor(pattern, { timeout = 60_000, since = lines.length, fatal } = {}) {
             const deadline = Date.now() + timeout;
             while (Date.now() < deadline) {
                 const match = lines.slice(since).find(line => pattern.test(line));
                 if (match) return match;
+                if (fatal && lines.slice(since).some(line => fatal.test(line)))
+                    throw new Error(`${name} could not start:\n  ${lines.slice(-15).join('\n  ')}`);
                 if (java && java.exitCode !== null) throw new Error(`${name} exited (${java.exitCode})`);
                 await sleep(200);
             }
@@ -173,7 +179,8 @@ export function startClient(name, { windowed = false, window, label, mods = [], 
         /** Up to the title screen (a windowed client downloads its assets the first time: allow for it). */
         async ready(timeout = windowed ? 1_800_000 : 600_000) {
             await launched;
-            await this.waitFor(/Sound engine started|OpenAL 1\.1 not supported|Created: .*gui\.png-atlas/, { timeout, since: 0 });
+            await this.waitFor(/Sound engine started|OpenAL 1\.1 not supported|Created: .*gui\.png-atlas/, { timeout, since: 0,
+                fatal: /Incompatible mods found!|Minecraft has crashed/ });
             await sleep(2000);
         },
         /** Joins a server: hmc-specifics `connect` headless, the link's `connect` windowed. */

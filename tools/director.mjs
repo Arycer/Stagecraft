@@ -104,7 +104,7 @@ function startServer({ start, cwd, log: file }, log) {
     log(`[director] started the server: ${start} (log ${output})`);
 }
 
-export async function director({ hmcHome, roles: specs, server = { host: 'localhost', port: 25571 }, start = false, windowMods = [], serverControl, log = console.log }) {
+export async function director({ hmcHome, roles: specs, server = { host: 'localhost', port: 25571 }, start = false, windowMods = [], serverControl, lang, log = console.log }) {
     if (hmcHome) process.env.STAGECRAFT_HMC_HOME = path.resolve(hmcHome);
     const hmc = await import(pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), 'hmc', 'hmc.mjs')).href);
     const roles = Object.fromEntries(Object.entries(specs).map(([name, spec]) => [name, parseRole(spec)]));
@@ -114,7 +114,7 @@ export async function director({ hmcHome, roles: specs, server = { host: 'localh
     if (start) {
         for (const [name, role] of Object.entries(roles)) {
             const client = hmc.startClient(role.client, {
-                windowed: role.window, window: slots[name], label: `${name} · ${role.client}`,
+                windowed: role.window, window: slots[name], label: `${name} · ${role.client}`, lang,
                 mods: role.window ? [...windowMods, ...role.mods] : role.mods, env: { STAGECRAFT_LINK: 'on' },
             });
             started.push(client);
@@ -192,6 +192,15 @@ export async function director({ hmcHome, roles: specs, server = { host: 'localh
         async run({ file, name, source, args = {}, perRole = {}, timeout = 16 * 60_000 }) {
             const scenarioName = name ?? path.basename(file ?? 'inline.lua', '.lua').replace(/[^A-Za-z0-9_-]/g, '_');
             const code = source ?? (file ? fs.readFileSync(file, 'utf8') : undefined);
+            const fixtureSource = file && path.join(path.dirname(file), 'fixtures');
+            const fixtures = {};
+            if (fixtureSource && fs.existsSync(fixtureSource)) {
+                for (const [roleName, role] of Object.entries(roles)) {
+                    const target = path.join(hmc.clientDir(role.client), 'config/stagecraft/fixtures');
+                    fs.cpSync(fixtureSource, target, { recursive: true });
+                    fixtures[roleName] = target.replaceAll('\\', '/');
+                }
+            }
             // A lib/ folder next to the scenario (or the parent's, for drafts/) becomes each client's scripts/lib,
             // so require('x') finds the same helpers everywhere.
             const libs = file ? [path.join(path.dirname(file), 'lib'), path.join(path.dirname(file), '..', 'lib')].filter(dir => fs.existsSync(dir)) : [];
@@ -220,7 +229,7 @@ export async function director({ hmcHome, roles: specs, server = { host: 'localh
             ]);
             try {
                 const runs = Object.entries(links).map(([role, link]) =>
-                    link.run(scenarioName, { source: code, args: { shared, ...args, ...(perRole[role] ?? {}), role }, timeout })
+                    link.run(scenarioName, { source: code, args: { shared, fixture_dir: fixtures[role], ...Object.fromEntries(Object.entries(roles).map(([r,s]) => ['client_'+r,s.client])), ...args, ...(perRole[role] ?? {}), role }, timeout })
                         .then(result => [role, result], error => [role, { status: 'failed', error: error.message, steps: [], logs: [] }]));
                 // run() resolves at the end; the 'started' events tell us every client is running.
                 await Promise.all(Object.values(links).map(link => new Promise(resolve => {
@@ -250,10 +259,11 @@ async function main() {
     const roles = {};
     const windowMods = [];
     const serverControl = {};
-    let hmcHome, start = false, windowAll = false, server = { host: 'localhost', port: 25571 };
+    let hmcHome, lang, start = false, windowAll = false, server = { host: 'localhost', port: 25571 };
     while (argv[0]?.startsWith('--')) {
         const flag = argv.shift();
         if (flag === '--hmc') hmcHome = argv.shift();
+        else if (flag === '--lang') lang = argv.shift();
         else if (flag === '--role') { const spec = argv.shift(); const eq = spec.indexOf('='); roles[spec.slice(0, eq)] = parseRole(spec.slice(eq + 1)); }
         else if (flag === '--start') start = true;
         else if (flag === '--window-all') windowAll = true;
@@ -275,7 +285,7 @@ async function main() {
         process.exit(2);
     }
     const args = Object.fromEntries(pairs.map(pair => [pair.slice(0, pair.indexOf('=')), pair.slice(pair.indexOf('=') + 1)]));
-    const d = await director({ hmcHome, roles, server, start, windowMods, serverControl });
+    const d = await director({ hmcHome, roles, server, start, windowMods, serverControl, lang });
     const summary = [];
     try {
         fs.mkdirSync(new URL('../build', import.meta.url), { recursive: true });
