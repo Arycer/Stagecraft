@@ -3,6 +3,7 @@ package me.arycer.stagecraft;
 import me.arycer.stagecraft.chat.TextKeys;
 import me.arycer.stagecraft.command.StagecraftCommands;
 import me.arycer.stagecraft.examples.ExampleInstaller;
+import me.arycer.stagecraft.host.client.ClientHostChannel;
 import me.arycer.stagecraft.link.Link;
 import me.arycer.stagecraft.script.ScenarioRunner;
 import net.fabricmc.api.ClientModInitializer;
@@ -32,6 +33,7 @@ public final class StagecraftClient implements ClientModInitializer {
         } catch (Exception error) {
             throw new IllegalStateException("Cannot create Stagecraft script directory", error);
         }
+        runner.setHost(new ClientHostChannel(client));
         Optional<Link> link = Link.start(client, runner, client.runDirectory.toPath().resolve("config/stagecraft"));
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> received(runner, link, message));
         ClientReceiveMessageEvents.CHAT.register((message, signed, sender, params, timestamp) -> received(runner, link, message));

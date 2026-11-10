@@ -37,6 +37,8 @@ public final class ScriptContext {
     private final ChatLog chat;
     private final BooleanSupplier cancelled;
     private final RunListener listener;
+    private final HostChannel host;
+    private final Signals signals;
     private final String runId;
     private final long started = System.nanoTime();
     /** Messages up to this sequence are not matched by the next expectation. */
@@ -46,7 +48,8 @@ public final class ScriptContext {
     private final List<AutoCloseable> finishers = new ArrayList<>();
 
     ScriptContext(MinecraftClient client, Origin origin, Map<String, String> args, RunReport report, RunLog log,
-                  ChatLog chat, BooleanSupplier cancelled, RunListener listener, String runId) {
+                  ChatLog chat, BooleanSupplier cancelled, RunListener listener, String runId,
+                  HostChannel host, Signals signals) {
         this.client = client;
         this.origin = origin;
         this.args = Map.copyOf(args);
@@ -55,6 +58,8 @@ public final class ScriptContext {
         this.chat = chat;
         this.cancelled = cancelled;
         this.listener = listener;
+        this.host = host;
+        this.signals = signals;
         this.runId = runId;
         this.cursor = chat.mark();
     }
@@ -66,6 +71,15 @@ public final class ScriptContext {
     public boolean cancelled() { return cancelled.getAsBoolean(); }
     /** Unique per run: scripts use it for paths and ids ({@code stage.run_id}). */
     public String runId() { return runId; }
+    public HostChannel host() { return host; }
+    public Signals signals() { return signals; }
+
+    /** Raises a signal here and announces it (the director relays it to the other clients). */
+    public void signal(String name) {
+        signals.raise(name);
+        trace("signal " + name);
+        listener.signal(name);
+    }
     int commands() { return commands; }
     String currentCommand() { return currentCommand; }
 

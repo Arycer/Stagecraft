@@ -14,4 +14,7 @@ public interface RunListener {
     default void step(String name, RunReport.Status status, String error) {}
 
     default void finished(RunReport report) {}
+
+    /** The script raised a signal ({@code stage.signal}); the director relays it to the other clients. */
+    default void signal(String name) {}
 }

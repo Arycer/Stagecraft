@@ -7,8 +7,10 @@ import me.arycer.stagecraft.report.RunReport;
 import me.arycer.stagecraft.script.api.ChatModule;
 import me.arycer.stagecraft.script.api.CoreModule;
 import me.arycer.stagecraft.script.api.GuiModule;
+import me.arycer.stagecraft.script.api.HostModule;
 import me.arycer.stagecraft.script.api.InstancedModule;
 import me.arycer.stagecraft.script.api.PlayerModule;
+import me.arycer.stagecraft.script.api.SignalModule;
 import me.arycer.stagecraft.script.api.StageModule;
 import me.arycer.stagecraft.script.api.WorldModule;
 import net.minecraft.client.MinecraftClient;
@@ -31,7 +33,7 @@ import java.util.function.Consumer;
  */
 public final class ScenarioRunner {
     private static final List<StageModule> MODULES = List.of(
-            new CoreModule(), new ChatModule(), new WorldModule(), new PlayerModule(), new GuiModule(), new InstancedModule());
+            new CoreModule(), new ChatModule(), new WorldModule(), new PlayerModule(), new GuiModule(), new HostModule(), new SignalModule(), new InstancedModule());
 
     private final MinecraftClient client;
     private final Path scripts;
@@ -41,6 +43,8 @@ public final class ScenarioRunner {
     private volatile String status = "idle";
     private volatile boolean cancelled;
     private volatile RunReport lastReport;
+    private final Signals signals = new Signals();
+    private volatile HostChannel host = HostChannel.NONE;
     private final List<RunListener> listeners = new CopyOnWriteArrayList<>();
     private static final int MAX_SOURCE_BYTES = 1_000_000;
 
@@ -110,6 +114,16 @@ public final class ScenarioRunner {
         return launch(name, "@" + name + ".lua", source, origin, args);
     }
 
+    /** The server host channel scripts reach with {@code stage.host}. */
+    public void setHost(HostChannel host) {
+        this.host = host;
+    }
+
+    /** A signal another client raised, relayed by the director. */
+    public void signal(String name) {
+        signals.raise(name);
+    }
+
     public void addListener(RunListener listener) {
         listeners.add(listener);
     }
@@ -127,7 +141,8 @@ public final class ScenarioRunner {
         String runId = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         cancelled = false;
         ScriptContext context = new ScriptContext(client, origin, args, report,
-                new RunLog(base.resolveSibling(base.getFileName() + ".log")), chat, () -> cancelled, events, runId);
+                new RunLog(base.resolveSibling(base.getFileName() + ".log")), chat, () -> cancelled, events, runId, host, signals);
+        signals.clear();
         current = context;
         status = "running " + name;
         worker = Thread.ofPlatform().daemon().name("stagecraft-script").unstarted(() -> {
@@ -165,6 +180,7 @@ public final class ScenarioRunner {
         @Override public void log(String text) { each(l -> l.log(text)); }
         @Override public void step(String name, RunReport.Status status, String error) { each(l -> l.step(name, status, error)); }
         @Override public void finished(RunReport report) { each(l -> l.finished(report)); }
+        @Override public void signal(String name) { each(l -> l.signal(name)); }
 
         private void each(Consumer<RunListener> call) {
             for (RunListener listener : listeners) {

@@ -81,6 +81,20 @@ class ApiV2Test {
         assertEquals("passed", report.json().get("status").getAsString(), report.json().toString());
     }
 
+    @Test void rolesAndSignals() throws Exception {
+        RunReport report = run("signals", """
+                assert(stage.role == "A")
+                stage.signal("ready")
+                stage.signal("ready")
+                assert(stage.wait_signal("ready", 2, 1) == 2)
+                assert(not pcall(stage.wait_signal, "never", 1, 0.2))
+                assert(stage.host_available() == false)
+                local ok, err = pcall(stage.host, "file.read", {path = "x"})
+                assert(not ok and tostring(err):find("No Stagecraft host"), tostring(err))
+                """, Map.of("role", "A"));
+        assertEquals("passed", report.json().get("status").getAsString(), report.json().toString());
+    }
+
     @Test void aFailureOutsideStepsStillShowsInJunit() throws Exception {
         RunReport report = run("outside", "stage.step('ok', function() end)\nerror('late')", Map.of());
         assertTrue(report.junit().contains("tests=\"2\" failures=\"1\""), report.junit());

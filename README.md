@@ -1,11 +1,11 @@
 # Stagecraft
 
-Mod de cliente Fabric para ejecutar escenarios Lua desde una ventana de Minecraft o HeadlessMC. Minecraft **1.21.1**, Yarn build 3, Java **21**, Loader **0.18.4** y Fabric API **0.116.11+1.21.1**. LuaJ está incluido en el jar.
+Mod Fabric para ejecutar escenarios Lua desde una ventana de Minecraft o HeadlessMC. Los scripts corren en el cliente; en el servidor, el mismo jar puede activar un host de pruebas (apagado por defecto) para ficheros y estado del servidor. Minecraft **1.21.1**, Yarn build 3, Java **21**, Loader **0.18.4** y Fabric API **0.116.11+1.21.1**. LuaJ está incluido en el jar.
 
 ## Instalación y ejecución
 
 1. Compilar con `gradlew.bat build collectHeadlessMods`.
-2. Instalar `build/libs/stagecraft-0.1.0.jar` y Fabric API en el cliente. El servidor no necesita Stagecraft.
+2. Instalar `build/libs/stagecraft-0.1.0.jar` y Fabric API en el cliente. El servidor solo lo necesita para `stage.host` (ver «Host de servidor»).
 3. Conectar al servidor y escribir `/stagecraft list`. Al arrancar se instalan `platform.lua`, `smoke.lua`, `fortress.lua` y `gui.lua` en `config/stagecraft/scripts/` dentro de la carpeta del juego. Un ejemplo que no has editado se actualiza solo cuando cambia la versión incluida en el mod; uno editado se conserva y la versión nueva queda al lado como `<nombre>.lua.new`. Los hashes de lo instalado están en `.examples.properties`.
 4. Ejecutar `/stagecraft run platform`, o un script propio guardado en esa carpeta.
 
@@ -97,6 +97,25 @@ Los nombres de archivo admiten letras ASCII, números, `_` y `-`. Las respuestas
 
 Hace falta Instanced **0.1.0** tanto en cliente como en servidor y sus dependencias. El adaptador está aislado y enlaza opcionalmente con `AdminClient.send`; no usa archivos del servidor ni añade permisos. Las versiones futuras de ese protocolo pueden requerir actualizar el adaptador: si `AdminClient` o su respuesta cambian, el guardado falla con un mensaje de versión incompatible. El límite de una definición es de 64 000 bytes en UTF-8. Los ejemplos `platform` y `smoke` no necesitan Instanced.
 
+## Host de servidor y varios clientes
+
+Con el jar también en el servidor y `config/stagecraft-server.properties` con `enabled=true` (el fichero se crea apagado), los scripts pueden pedir al servidor lo que un cliente no ve. Responde solo a jugadores con `permission_level` (2 por defecto) y solo toca ficheros bajo `root` (relativo a la carpeta del servidor; rutas absolutas, `..` o enlaces que salgan de ahí se rechazan). `allow_write=false` lo deja en solo lectura. **Es para servidores de prueba locales**: al arrancar avisa en el log si está activo.
+
+| Función | Uso |
+|---|---|
+| `stage.host_available()` | Si el servidor tiene el canal de Stagecraft. |
+| `stage.host(nombre, {args})` | Llama a una función del host y devuelve su resultado como tabla. |
+
+Funciones: `host.info`; `file.exists`, `file.read` → `{text, size}`, `file.list` → `{entries}`, `file.write` / `file.append` (`{path, text}`; los textos grandes se envían troceados, porque un paquete al servidor admite unos 32 KB), `file.delete` (`{path, recursive}`); `nbt.read` → `{json, snbt}`; `server.command` (`{command}`, como consola, con nivel 4) → `{output}`; `server.players`; `world.block` (`{dimension, x, y, z}`) → `{id, state}`.
+
+Para escenarios con varios clientes, `tools/director.mjs` ejecuta el mismo Lua en cada cliente con un rol (`stage.role`) y retransmite las señales: `stage.signal(nombre)` cuenta en ese cliente y en todos los demás, y `stage.wait_signal(nombre, n=1, segundos=60)` espera a que se haya dado `n` veces. Así, si cuatro clientes dan `listo` y esperan 4, se encuentran en ese punto. Pasa solo si pasan todos los roles, y deja el resumen en `build/director-<escenario>.json`.
+
+```powershell
+node tools/director.mjs --hmc <mc-headless> --role A=HmcInstancedA --role B=HmcInstancedB --start run tools/scenarios/duo.lua
+```
+
+Con `--start` lanza los clientes (con el enlace activo) y los conecta a `--server` (`localhost:25571` por defecto); sin él usa clientes ya abiertos con `STAGECRAFT_LINK=on`. Reiniciar el servidor desde el director aún no está implementado.
+
 ## Enlace (WebSocket) y HeadlessMC
 
 Un proceso externo (Node, un director de pruebas) puede controlar el cliente sin leer su `console.log`. El enlace está **apagado por defecto**. Se enciende con la variable de entorno `STAGECRAFT_LINK=on` (o un puerto) o con `config/stagecraft/link.properties` (`enabled=true`, `port=…`). Escucha solo en 127.0.0.1 y exige el token que publica en `config/stagecraft/link.json` (`port`, `token`, `pid`, `protocol`); el token es nuevo en cada arranque y el fichero se borra al cerrar.
@@ -107,9 +126,9 @@ Protocolo JSON, una petición `{id, type, …}` y una respuesta `{id, type: "rep
 |---|---|
 | `status` | `status`, `run_id`, `scenarios` |
 | `run` (`name`; `source` para Lua inline; `args`; `origin` con `dimension, x, y, z, yaw, pitch`, lo que falte sale del jugador) | `run_id` |
-| `cancel`, `command` (`command`, enviado como el jugador), `player` (`connected`, nombre, dimensión, posición) | — |
+| `cancel`, `command` (`command`, enviado como el jugador), `player` (`connected`, nombre, dimensión, posición), `signal` (`name`, retransmitida desde otro cliente) | — |
 
-Eventos para todas las conexiones `{type: "event", event, run_id}`: `started`, `log`, `step` (nombre, estado, error), `finished` (estado, error e informe JSON completo) y `chat` (texto y claves de traducción con sus argumentos).
+Eventos para todas las conexiones `{type: "event", event, run_id}`: `started`, `log`, `step` (nombre, estado, error), `signal`, `finished` (estado, error e informe JSON completo) y `chat` (texto y claves de traducción con sus argumentos).
 
 `tools/stagecraft-link.mjs` es el cliente Node, sin dependencias (WebSocket global de Node 22+): `connect(dirCliente)`, `run(nombre, {source, args, origin})` → `{status, error, report, logs, steps}`, `on(evento)`, `waitChat(regex | clave)`, `command`, `player`, `cancel`. También como CLI:
 

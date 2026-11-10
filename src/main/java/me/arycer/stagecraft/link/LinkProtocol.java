@@ -31,10 +31,10 @@ import java.util.function.Supplier;
  *       {@code args} (object of strings) and {@code origin} ({@code dimension, x, y, z, yaw, pitch}; missing
  *       fields come from the player); replies {@code run_id};</li>
  *   <li>{@code cancel}; {@code player} (name, dimension, position; {@code connected});
- *       {@code command} (sends {@code command} as the player).</li>
+ *       {@code command} (sends {@code command} as the player); {@code signal} ({@code name}, relayed from another client).</li>
  * </ul>
  * Every connection also gets events {@code {"type": "event", "event": …}}: {@code started}, {@code log},
- * {@code step}, {@code finished} (with the JSON report) and {@code chat} (text and translation keys).
+ * {@code step}, {@code signal}, {@code finished} (with the JSON report) and {@code chat} (text and translation keys).
  */
 public final class LinkProtocol implements RunListener {
     public static final int VERSION = 1;
@@ -75,6 +75,10 @@ public final class LinkProtocol implements RunListener {
                 }
                 case "player" -> onClient(this::player);
                 case "command" -> command(message);
+                case "signal" -> {
+                    runner.signal(message.get("name").getAsString());
+                    yield new JsonObject();
+                }
                 default -> throw new IllegalArgumentException("Unknown request type: " + type);
             };
             reply.add("id", id);
@@ -217,6 +221,13 @@ public final class LinkProtocol implements RunListener {
         event.add("status", json.get("status"));
         if (json.has("error")) event.add("error", json.get("error"));
         event.add("report", json);
+        broadcast(event);
+    }
+
+    @Override
+    public void signal(String name) {
+        JsonObject event = event("signal");
+        event.addProperty("name", name);
         broadcast(event);
     }
 

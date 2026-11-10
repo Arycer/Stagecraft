@@ -1,6 +1,6 @@
 # Stagecraft
 
-Standalone client-only Fabric mod. Read README.md and docs/implementation-plan.md before changes.
+Fabric mod: scripts run on the client; the same jar has an optional server-side test host (off by default). Read README.md and docs/implementation-plan.md before changes.
 Minecraft 1.21.1, Yarn 1.21.1+build.3, Java 21, Fabric Loader 0.18.4, Fabric API 0.116.11+1.21.1.
 
 - Preserve stable origin semantics: snapshot once; player movement must not alter placement.
@@ -21,6 +21,9 @@ Minecraft 1.21.1, Yarn 1.21.1+build.3, Java 21, Fabric Loader 0.18.4, Fabric API
 | `examples` | `ExampleInstaller` | — |
 | `integration.instanced` | `InstancedBridge` (reflection; optional) | — |
 | `link` | `Link` (start, `link.json`), `LinkConfig` (off by default), `LinkServer` (WebSocket on 127.0.0.1 with token), `LinkProtocol` (requests and events, a `RunListener`) | `script`, `placement`, `report`, `chat` |
+| `host` | Host payloads and limits (both sides) | — |
+| `host.client` | `ClientHostChannel` (the `script.HostChannel` over the payloads) | `host`, `script` |
+| `server` | `StagecraftServer` (common entrypoint: payloads; answers host requests when enabled), `HostConfig`, `ServerFiles` (root sandbox), `HostFunctions`. Never imports client classes (`ArchitectureTest`) | `host` |
 | `gui` / `mixin` | `ScreenCapture` (text drawn per frame with its transformed box, only while a run holds a handle), `ScreenElements`, `ScreenKinds` (readable vanilla screen names; classes are intermediary in production), `Keys`; mixins on `DrawContext.drawText`, `GameRenderer.render`, `Screen.renderWithTooltip` | `mixin` → `gui` |
 
 `ArchitectureTest` enforces the table; a new package needs a row there. A new `stage.*` function goes in the

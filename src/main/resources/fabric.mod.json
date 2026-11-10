@@ -5,9 +5,12 @@
   "name": "Stagecraft",
   "authors": ["Arycer"],
   "license": "MIT",
-  "description": "Client-side Lua scenarios for Minecraft builders and tests.",
-  "environment": "client",
-  "entrypoints": { "client": ["me.arycer.stagecraft.StagecraftClient"] },
+  "description": "Lua scenarios for Minecraft builders and tests, run by the client; optional server-side test host (off by default).",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["me.arycer.stagecraft.server.StagecraftServer"],
+    "client": ["me.arycer.stagecraft.StagecraftClient"]
+  },
   "mixins": ["stagecraft.mixins.json"],
   "depends": { "fabricloader": ">=0.18.4", "minecraft": "1.21.1", "java": ">=21", "fabric-api": "*" }
 }

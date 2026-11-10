@@ -34,7 +34,26 @@ class ArchitectureTest {
             Map.entry("script", Set.of("script.api", "chat", "report", "placement")),
             Map.entry("script.api", Set.of("script", "chat", "report", "placement", "integration.instanced", "gui")),
             Map.entry("command", Set.of("script", "placement")),
-            Map.entry("link", Set.of("script", "placement", "report", "chat")));
+            Map.entry("link", Set.of("script", "placement", "report", "chat")),
+            Map.entry("host", Set.of()),
+            Map.entry("host.client", Set.of("host", "script")),
+            Map.entry("server", Set.of("host")));
+
+    /** Loaded on a dedicated server: must not touch client-only classes. */
+    private static final Set<String> SERVER_SAFE = Set.of("host", "server");
+    private static final Pattern CLIENT_IMPORT = Pattern.compile("^import (?:static )?(net\\.minecraft\\.client\\.|net\\.fabricmc\\.fabric\\.api\\.client\\.)", Pattern.MULTILINE);
+
+    @Test void serverSidePackagesDoNotImportClientClasses() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (String pkg : SERVER_SAFE) {
+            try (var files = Files.list(ROOT.resolve(pkg.replace('.', '/')))) {
+                for (Path file : files.filter(f -> f.toString().endsWith(".java")).toList()) {
+                    if (CLIENT_IMPORT.matcher(Files.readString(file)).find()) violations.add(ROOT.relativize(file).toString());
+                }
+            }
+        }
+        assertEquals(List.of(), violations);
+    }
 
     @Test void packagesOnlyImportWhatTheyAreAllowedTo() throws IOException {
         List<String> violations = new ArrayList<>();
