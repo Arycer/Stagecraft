@@ -1,0 +1,4 @@
+-- Ported from instanced.rejoin.e2e.mjs by tools/port-scenario.mjs: review the TODOs before relying on it.
+-- Run: node tools/director.mjs --start --role A=HmcInstancedA run <this file>
+-- Server files go through stage.host: the server needs Stagecraft with config/stagecraft-server.properties enabled=true.
+-- TODO: the recording stopped early: ENOENT: no such file or directory, stat 'C:\Users\conta\AppData\Local\Temp\stagecraft-port-WeICLR\logs\latest.log'

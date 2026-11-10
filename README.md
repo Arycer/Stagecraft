@@ -1,6 +1,6 @@
 # Stagecraft
 
-Mod Fabric para ejecutar escenarios Lua desde una ventana de Minecraft o HeadlessMC. Los scripts corren en el cliente; en el servidor, el mismo jar puede activar un host de pruebas (apagado por defecto) para ficheros y estado del servidor. Minecraft **1.21.1**, Yarn build 3, Java **21**, Loader **0.18.4** y Fabric API **0.116.11+1.21.1**. LuaJ está incluido en el jar.
+Mod Fabric para ejecutar escenarios Lua en clientes reales de Minecraft (con ventana o headless con HeadlessMC), también varios a la vez con el director. Los scripts corren en el cliente; en el servidor, el mismo jar puede activar un host de pruebas (apagado por defecto) para ficheros y estado del servidor. Minecraft **1.21.1**, Yarn build 3, Java **21**, Loader **0.18.4** y Fabric API **0.116.11+1.21.1**. LuaJ está incluido en el jar.
 
 ## Instalación y ejecución
 
@@ -98,60 +98,68 @@ Los nombres de archivo admiten letras ASCII, números, `_` y `-`. Las respuestas
 
 Hace falta Instanced **0.1.0** tanto en cliente como en servidor y sus dependencias. El adaptador está aislado y enlaza opcionalmente con `AdminClient.send`; no usa archivos del servidor ni añade permisos. Las versiones futuras de ese protocolo pueden requerir actualizar el adaptador: si `AdminClient` o su respuesta cambian, el guardado falla con un mensaje de versión incompatible. El límite de una definición es de 64 000 bytes en UTF-8. Los ejemplos `platform` y `smoke` no necesitan Instanced.
 
-## Host de servidor y varios clientes
+## Tests en clientes reales: director, clientes y enlace
 
-Con el jar también en el servidor y `config/stagecraft-server.properties` con `enabled=true` (el fichero se crea apagado), los scripts pueden pedir al servidor lo que un cliente no ve. Responde solo a jugadores con `permission_level` (2 por defecto) y solo toca ficheros bajo `root` (relativo a la carpeta del servidor; rutas absolutas, `..` o enlaces que salgan de ahí se rechazan). `allow_write=false` lo deja en solo lectura. **Es para servidores de prueba locales**: al arrancar avisa en el log si está activo.
+> Guía completa para montar tests (también para agentes): la skill
+> [`.claude/skills/stagecraft-tests`](.claude/skills/stagecraft-tests/SKILL.md), con la API completa, el
+> director, el host de servidor, el port de escenarios, problemas frecuentes y plantillas probadas.
 
-| Función | Uso |
-|---|---|
-| `stage.host_available()` | Si el servidor tiene el canal de Stagecraft. |
-| `stage.host(nombre, {args})` | Llama a una función del host y devuelve su resultado como tabla. |
+`tools/director.mjs` ejecuta un escenario Lua en uno o varios clientes reales, cada uno con un rol (`stage.role`).
+Retransmite las señales entre clientes (`stage.signal` / `stage.wait_signal`) y pasa solo si pasan todos los roles.
+Cada cliente puede ser **headless** (HeadlessMC, sin ventana), **con ventana** (una ventana normal que se puede
+ver mientras se ejecuta) o una **combinación**. Las ventanas se colocan en mosaico sobre el monitor principal
+para que todas sean visibles, y el título lleva el rol.
 
-Funciones: `host.info`; `file.exists`, `file.read` → `{text, size}`, `file.list` → `{entries}`, `file.write` / `file.append` (`{path, text}`; los textos grandes se envían troceados, porque un paquete al servidor admite unos 32 KB), `file.delete` (`{path, recursive}`); `nbt.read` → `{json, snbt}`; `server.command` (`{command}`, como consola, con nivel 4) → `{output}`; `server.players`; `world.block` (`{dimension, x, y, z}`) → `{id, state}`.
-
-Para escenarios con varios clientes, `tools/director.mjs` ejecuta el mismo Lua en cada cliente con un rol (`stage.role`) y retransmite las señales: `stage.signal(nombre)` cuenta en ese cliente y en todos los demás, y `stage.wait_signal(nombre, n=1, segundos=60)` espera a que se haya dado `n` veces. Así, si cuatro clientes dan `listo` y esperan 4, se encuentran en ese punto. Pasa solo si pasan todos los roles, y deja el resumen en `build/director-<escenario>.json`.
-
-```powershell
-node tools/director.mjs --hmc <mc-headless> --role A=HmcInstancedA --role B=HmcInstancedB --start run tools/scenarios/duo.lua
+```bash
+node tools/hmc/setup.mjs                                    # una vez: HeadlessMC y hmc-specifics en run/hmc
+export HMC_MODS="<Stagecraft>/build/headless-mods;<mod>/build/headless-mods"
+node tools/director.mjs --start --role A=HmcA run scenarios/duo.lua                       # headless
+node tools/director.mjs --start --role A=HmcA:window --role B=HmcB run scenarios/duo.lua  # A visible, B headless
+node tools/director.mjs --start --window-all --role A=HmcA --role B=HmcB run examples/gui.lua
 ```
 
-Con `--start` lanza los clientes (con el enlace activo) y los conecta a `--server` (`localhost:25571` por defecto); sin él usa clientes ya abiertos con `STAGECRAFT_LINK=on`. Reiniciar el servidor desde el director aún no está implementado.
+- **Headless:** pasan por HeadlessMC con LWJGL simulado y assets falsos.
+- **Con ventana:**
+  - Se lanzan directamente con `tools/hmc/launch.mjs`, desde lo que HeadlessMC ya descargó. En Windows, HeadlessMC solo admite una cuenta offline en modo headless.
+  - Usan assets reales en `run/hmc/assets`: unos 107 MB; los sonidos (unos 720 MB) solo con `STAGECRAFT_HMC_SOUNDS=1`.
+  - No cargan hmc-specifics: se manejan por el enlace (`connect`, comandos, `quit`).
+  - `--window-mods <dir>` añade mods solo a estas ventanas, por ejemplo Veil, que necesita OpenGL.
+- **Mosaico:** Stagecraft coloca cada ventana a partir de `STAGECRAFT_WINDOW=i/n` (o `x,y,w,h`) y pone `STAGECRAFT_LABEL` en el título.
 
-## Enlace (WebSocket) y HeadlessMC
+### Host de servidor
 
-Un proceso externo (Node, un director de pruebas) puede controlar el cliente sin leer su `console.log`. El enlace está **apagado por defecto**. Se enciende con la variable de entorno `STAGECRAFT_LINK=on` (o un puerto) o con `config/stagecraft/link.properties` (`enabled=true`, `port=…`). Escucha solo en 127.0.0.1 y exige el token que publica en `config/stagecraft/link.json` (`port`, `token`, `pid`, `protocol`); el token es nuevo en cada arranque y el fichero se borra al cerrar.
+Con el mismo jar en el servidor y `enabled=true` en `config/stagecraft-server.properties` (el fichero se crea apagado), `stage.host(nombre, {args})` lee y escribe ficheros bajo `root`, ejecuta comandos de consola y lee jugadores, bloques y NBT.
+- Responde solo a jugadores con `permission_level`.
+- Rechaza rutas absolutas, `..` y enlaces que salgan de `root`.
+- Al arrancar avisa en el log si está activo.
+- Es solo para servidores de prueba locales.
 
-Protocolo JSON, una petición `{id, type, …}` y una respuesta `{id, type: "reply" | "error"}`:
+Funciones y límites: [server-host.md](.claude/skills/stagecraft-tests/references/server-host.md).
 
-| Petición | Respuesta |
-|---|---|
-| `status` | `status`, `run_id`, `scenarios` |
-| `run` (`name`; `source` para Lua inline; `args`; `origin` con `dimension, x, y, z, yaw, pitch`, lo que falte sale del jugador) | `run_id` |
-| `cancel`, `command` (`command`, enviado como el jugador), `player` (`connected`, nombre, dimensión, posición), `signal` (`name`, retransmitida desde otro cliente) | — |
+### Enlace (WebSocket)
 
-Eventos para todas las conexiones `{type: "event", event, run_id}`: `started`, `log`, `step` (nombre, estado, error), `signal`, `finished` (estado, error e informe JSON completo) y `chat` (texto y claves de traducción con sus argumentos).
+Está **apagado por defecto** y se enciende con `STAGECRAFT_LINK=on` o con `config/stagecraft/link.properties`. Escucha solo en 127.0.0.1 y exige el token que publica en `config/stagecraft/link.json`.
+- Peticiones: `status`, `run` (script o Lua inline), `cancel`, `command`, `player`, `signal`, `connect`, `disconnect`, `quit`.
+- Eventos: `started`, `log`, `step`, `signal`, `finished` (con el informe) y `chat` (con claves de traducción).
 
-`tools/stagecraft-link.mjs` es el cliente Node, sin dependencias (WebSocket global de Node 22+): `connect(dirCliente)`, `run(nombre, {source, args, origin})` → `{status, error, report, logs, steps}`, `on(evento)`, `waitChat(regex | clave)`, `command`, `player`, `cancel`. También como CLI:
+`tools/stagecraft-link.mjs` es el cliente Node (sin dependencias) y también una CLI:
 
-```powershell
-$env:STAGECRAFT_LINK='on'
-$env:HMC_MODS='C:UserscontaIdeaProjectsStagecraftuildheadless-mods;C:UserscontaIdeaProjectsInstancedabric-clientuildheadless-mods'
-$env:HMC_VERSION='fabric-loader-0.18.4-1.21.1'
-node hmc.mjs start HmcInstancedA
-# Desde otra consola:
-node hmc.mjs send HmcInstancedA 'connect localhost 25571'
-node tools/stagecraft-link.mjs <mc-headless>/client-HmcInstancedA run platform size=5
-node tools/stagecraft-link.mjs <mc-headless>/client-HmcInstancedA run-file mi-escenario.lua
+```bash
+node tools/stagecraft-link.mjs HmcA status
+node tools/stagecraft-link.mjs HmcA run-file mi-escenario.lua clave=valor
 ```
 
-Sin enlace, desde la consola de hmc-specifics se puede seguir enviando `/stagecraft run …`. El perfil Fabric debe estar instalado en HeadlessMC.
+Protocolo completo: [director.md](.claude/skills/stagecraft-tests/references/director.md).
+
+### Escenarios
+
+`scenarios/` guarda escenarios terminados: `duo.lua` (host + señales con dos clientes) e `instanced/` (los de Instanced, portados de `mc-headless`, con borradores en `drafts/`). Los escenarios `.mjs` antiguos siguen en `Documents/mc-test-tools/mc-headless`, donde `hmc.mjs` es ahora un shim que apunta a `tools/hmc/hmc.mjs`.
 
 ## Verificación de desarrollo
 
-`gradlew.bat build` ejecuta las pruebas de origen y compilación de todos los ejemplos Lua. `tools/verify-hmc.mjs` comprueba por el enlace un cliente HMC ya conectado (con `STAGECRAFT_LINK=on`), creativo y OP en un servidor de pruebas; `--gui` añade el ejemplo `gui`: origen relativo/fijo/orientado, dimensión explícita, errores, cancelación, límite de instrucciones y opcionalmente fortress completo con portal. Escribe `build/hmc-verification.json`.
+`gradlew.bat build` ejecuta las pruebas de origen y compilación de todos los ejemplos Lua. `tools/verify-hmc.mjs` comprueba por el enlace un cliente de `tools/hmc` ya conectado (`HMC_NAME`, por defecto `HmcInstancedA`; con `STAGECRAFT_LINK=on`), creativo y OP en un servidor de pruebas; `--gui` añade el ejemplo `gui`: origen relativo/fijo/orientado, dimensión explícita, errores, cancelación, límite de instrucciones y opcionalmente fortress completo con portal. Escribe `build/hmc-verification.json`.
 
 ```powershell
-$env:HMC_HOME='C:\Users\conta\Documents\mc-test-tools\mc-headless'
 $env:INSTANCED_SERVER_DIR='C:\Users\conta\IdeaProjects\Instanced\fabric-server\run'
 node tools/verify-hmc.mjs --fortress
 ```
@@ -170,6 +178,6 @@ Para repetir las comprobaciones del portal de la última fortaleza sin reconstru
 - varios clientes pasan a roles, con señales que conservan el orden;
 - el `finally` del original pasa a una limpieza que también se ejecuta tras un fallo.
 
-Lo que depende de la salida (pantallas leídas con `render`, coordenadas calculadas, bucles de sondeo o un paso que falla al grabar) queda marcado como `TODO`. El estado del port está en `mc-headless/stagecraft/README.md`.
+Lo que depende de la salida (pantallas leídas con `render`, coordenadas calculadas, bucles de sondeo o un paso que falla al grabar) queda marcado como `TODO`. El estado del port está en `scenarios/instanced/README.md`.
 
 `tools/port-fortress.mjs` documenta la migración desde el escenario Node original y genera el Lua incluido. Es una herramienta de desarrollo; no se necesita para ejecutar el mod.
