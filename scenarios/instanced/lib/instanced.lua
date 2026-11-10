@@ -160,6 +160,9 @@ end
 
 function M.cleanup(fn)
   pcall(stage.close)
+  -- A vanilla cross-dimension tp does not remove Instanced membership. End it explicitly before
+  -- moving out, otherwise the next scenario still sees this player as inside the old instance.
+  pcall(stage.command,'instanced instance kick @s')
   pcall(M.tp_to,'minecraft:overworld',0.5,100,-3.5)
   if fn then fn() end
 end
