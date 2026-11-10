@@ -1,0 +1,26 @@
+local I=require('instanced')
+local c,first
+local ok,failure=pcall(function()
+  stage.step('preparar vuelta de un minuto y límite de dos',function() c=I.dungeon({returns=1,cap=2}) end)
+  stage.step('el ticket permite volver a la misma instancia',function()
+    c.enter(); first=assert(c.ids()[1]); c.exit()
+    assert(c.ids()[1]==first,'liberada antes de caducar')
+    c.enter(); local ids=c.ids(); assert(#ids==1 and ids[1]==first,'volvió a otra instancia')
+  end)
+  stage.step('instance reset libera y la siguiente entrada crea otra',function()
+    c.exit(); stage.command('instance reset'); stage.expect_chat('Se ha reiniciado 1 instancia',10)
+    stage.wait(2); assert(#c.ids()==0,'no se liberó')
+    c.enter(); local ids=c.ids(); assert(#ids==1 and ids[1]~=first); first=ids[1]
+  end)
+  stage.step('el ticket mantiene la instancia hasta caducar',function()
+    c.exit(); assert(c.ids()[1]==first)
+    stage.wait(50); assert(c.ids()[1]==first,'liberada antes del minuto')
+    stage.wait(15); assert(#c.ids()==0,'ticket sin caducar')
+  end)
+  stage.step('el límite por hora rechaza la tercera entrada',function()
+    c.enter([[Has entrado en 2 instancias en la última hora; podrás entrar en una nueva dentro de \d\d:\d\d\.]])
+    stage.assert_dimension('minecraft:overworld')
+  end)
+end)
+if c then c.cleanup() end
+if not ok then error(failure,0) end

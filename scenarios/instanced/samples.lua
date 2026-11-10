@@ -1,7 +1,6 @@
--- Ported from instanced.samples.mjs by tools/port-scenario.mjs: review the TODOs before relying on it.
--- Run: node tools/director.mjs --start --role A=HmcInstancedA run <this file>
--- Server files go through stage.host: the server needs Stagecraft with config/stagecraft-server.properties enabled=true.
-
+local I = require('instanced')
+-- Preparation fixture, deliberately retained for subsequent scenarios.
+stage.step('preparar samples', function()
 stage.host('file.write', {path = "config/instanced/templates/demo/pillar.nbt", base64 = "H4sIAAAAAAAACqXQwWrDMAwG4D+x28bZYS+ww55j553HTrsG11VXUTc2lmCwpx8mtIU0h8AExof/Q0jqAYOnd6/+i4pwGoFncbDCv2RQw+lt6u+wyz6SKvUAbAf74S+ElwuPFIo/6ltOkeVEh+FAlCV6JSyocGKhuKhe7+oWDvvC4TyIei7So/8sKVNRJumwPfrA4zcseVH8v80P1TYO231M4Sx1z52DyUmul2gwVWOwEa2z13o0zQrTrjBmhbEz08wMFmZuZ6ZdMAYOHY3K9UpT/AeiwFUpMQIAAA=="})
 stage.host('file.write', {path = "config/instanced/templates/demo/fountain.nbt", base64 = "H4sIAAAAAAAACo3SMU/DMBCG4S8+F5oydIKl/BJmZkbWyI0OyWpiV76TEPx6VFDaqnLCZbGie20/gzcA4eE1aHjnIjEnYCstvMRvJpyGwGpaW9wfw8CqvAHg1/BvYWQ8jTFxX8KHvojmxN2+xP4gmObby/wzKJfz4PkyGLPIV1fd/nh1PIduCEm5JLS42w+5P8jJsmtBxyyT+PwRVqJB+fen3jSGxhkaMjR+oWkM5qm5NjczjTM0ZGiWzM5gdgazM5idwewMZjKYyWAmg5kMZjKYvcHsK+a5Zuk9+4p5rvnvbTQ3d7lK424aQos1J40aWf6u+QEpVDTxpQQAAA=="})
 stage.host('file.write', {path = "config/instanced/templates/demo/decor/lantern_post.nbt", base64 = "H4sIAAAAAAAACo3NsQ7CMAwE0GsToCkDYuNbOjMzslamuFLUNqliT3w9CqggwVIv1slP5xow2J9J6cpJfAzAQRys+Acb5CNQALB5O+xmGlmVawBlBXuhiXGafOAuUa/NndLQRhrankPHWMTxK0YKyinAYXsbYzdIrrIOZo6yPPyMwUaUlF/h3xQrTLnCmB9TwKHioF49y5s8AQWVJx4oAQAA"})
@@ -45,3 +44,5 @@ stage.host('file.write', {path = "config/instanced/pools/demo/loot.json", text =
     }
   ]
 }]]})
+
+end)
