@@ -1,0 +1,31 @@
+local I=require('instanced')
+local ns='sc_'..stage.run_id
+local level=ns..':void'
+local dim='instanced:level/'..ns..'/void'
+local function enter()
+  stage.command('gamemode spectator')
+  I.tp_to(dim,0,100,0); I.wait_dimension(dim)
+end
+local ok,failure=pcall(function()
+  stage.step('crear una dimensión sin reiniciar',function()
+    stage.host('file.write',{path=I.CONFIG..'schematics/'..ns..'/void.nbt',base64=require('fixtures').void})
+    I.write_level(level,'{"name":"Vacío Lua","dimension":{"type":'..I.TYPE..',"seed":5},"schematic":{"file":"schematics/'..ns..'/void.nbt"}}')
+    I.reload(); I.wait_level(level..' activo .*dimensión loaded',60)
+  end)
+  stage.step('el cliente entra en la dimensión dinámica',enter)
+  stage.step('reiniciar y recuperar la dimensión',function()
+    stage.restart_server()
+    I.wait_level(level..' activo .*dimensión loaded',30)
+    enter()
+  end)
+  stage.step('borrar el nivel expulsa al jugador y elimina la dimensión',function()
+    I.delete_namespace(ns)
+    stage.command('instanced reload')
+    stage.expect_chat('La dimensión en la que estabas se ha cerrado',20)
+    I.wait_dimension('minecraft:overworld')
+    stage.command('execute in '..dim..' run tp @s 0 100 0')
+    stage.expect_key('argument.dimension.invalid',10)
+  end)
+end)
+I.cleanup(function() I.delete_namespace(ns); I.reload(); stage.command('gamemode creative') end)
+if not ok then error(failure,0) end
