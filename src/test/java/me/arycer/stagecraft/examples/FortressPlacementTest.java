@@ -1,4 +1,4 @@
-package me.arycer.stagecraft;
+package me.arycer.stagecraft.examples;
 
 import org.junit.jupiter.api.Test;
 import org.luaj.vm2.Globals;

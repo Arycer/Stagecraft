@@ -1,4 +1,4 @@
-package me.arycer.stagecraft;
+package me.arycer.stagecraft.chat;
 
 import net.minecraft.text.Text;
 import net.minecraft.text.TranslatableTextContent;

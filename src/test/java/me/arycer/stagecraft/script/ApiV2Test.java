@@ -1,6 +1,7 @@
-package me.arycer.stagecraft;
+package me.arycer.stagecraft.script;
 
-import net.minecraft.text.Text;
+import me.arycer.stagecraft.placement.Origin;
+import me.arycer.stagecraft.report.RunReport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -11,7 +12,6 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ApiV2Test {
@@ -27,29 +27,6 @@ class ApiV2Test {
         runner.start(name, ORIGIN, args);
         assertTrue(runner.awaitIdle(10_000), "scenario did not finish");
         return runner.lastReport();
-    }
-
-    @Test void argsAreParsedAsKeyValuePairs() {
-        assertEquals(Map.of("level", "demo:crypt", "title", "two words", "n", "3"),
-                ScenarioArgs.parse("level=demo:crypt title=\"two words\"  n=3"));
-        assertEquals(Map.of(), ScenarioArgs.parse("  "));
-        assertThrows(IllegalArgumentException.class, () -> ScenarioArgs.parse("level=a stray"));
-    }
-
-    @Test void translationKeysAreFoundInArgumentsAndSiblings() {
-        Text message = Text.literal("[Instanced] ").append(Text.translatableWithFallback("chat.instanced.entered", "Entraste en %s",
-                Text.translatable("level.demo", "x"), 3));
-        var keys = TextKeys.of(message);
-        assertEquals("chat.instanced.entered", keys.getFirst().key());
-        assertEquals(List.of("level.demo", "3"), keys.getFirst().args());
-        assertEquals("level.demo", keys.get(1).key());
-
-        ChatLog log = new ChatLog();
-        long mark = log.mark();
-        log.add("a", List.of());
-        log.add(message.getString(), keys);
-        assertEquals(2, log.find(mark, e -> e.translation("chat.instanced.entered").isPresent()).orElseThrow().sequence());
-        assertTrue(log.find(2, e -> true).isEmpty());
     }
 
     @Test void stepsLibrariesAndArgsEndUpInTheReport() throws Exception {

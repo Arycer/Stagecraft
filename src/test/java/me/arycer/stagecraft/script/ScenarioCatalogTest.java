@@ -1,4 +1,4 @@
-package me.arycer.stagecraft;
+package me.arycer.stagecraft.script;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

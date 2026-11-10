@@ -1,4 +1,4 @@
-package me.arycer.stagecraft;
+package me.arycer.stagecraft.script;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

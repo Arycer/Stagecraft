@@ -1,4 +1,4 @@
-package me.arycer.stagecraft;
+package me.arycer.stagecraft.placement;
 
 import java.math.BigDecimal;
 

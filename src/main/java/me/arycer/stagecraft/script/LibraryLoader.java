@@ -1,4 +1,4 @@
-package me.arycer.stagecraft;
+package me.arycer.stagecraft.script;
 
 import org.luaj.vm2.Globals;
 import org.luaj.vm2.LuaError;

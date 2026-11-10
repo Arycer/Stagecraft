@@ -1,5 +1,6 @@
-package me.arycer.stagecraft;
+package me.arycer.stagecraft.examples;
 
+import me.arycer.stagecraft.script.ScenarioRunner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

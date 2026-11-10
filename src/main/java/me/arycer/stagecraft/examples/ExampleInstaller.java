@@ -1,4 +1,4 @@
-package me.arycer.stagecraft;
+package me.arycer.stagecraft.examples;
 
 import java.io.IOException;
 import java.io.InputStream;

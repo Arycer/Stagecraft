@@ -1,6 +1,7 @@
-package me.arycer.stagecraft;
+package me.arycer.stagecraft.report;
 
 import com.google.gson.GsonBuilder;
+import me.arycer.stagecraft.placement.Origin;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
