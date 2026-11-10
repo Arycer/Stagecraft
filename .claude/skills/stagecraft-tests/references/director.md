@@ -37,7 +37,9 @@ Exit code: 0 if every role passed. Output: `[director] A ok <step>` / `FAIL`, si
 Windowed clients are tiled over the primary monitor's work area in role order: 1 window = full area,
 2 = side by side, 3–4 = 2×2, 5–6 = 3×2, … The title shows `[<role> · <client>]`. Placement is done by
 Stagecraft from `STAGECRAFT_WINDOW=i/n` (or `x,y,w,h` for an explicit outer rectangle) and the label from
-`STAGECRAFT_LABEL`; you can set them yourself when launching by hand.
+`STAGECRAFT_LABEL`; you can set them yourself when launching by hand. To check where the windows really are:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/hmc/windows.ps1` (monitors' work areas and each Minecraft
+window's outer rectangle).
 
 ### Library use (custom Node test runners)
 

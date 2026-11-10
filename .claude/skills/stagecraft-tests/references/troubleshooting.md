@@ -18,6 +18,7 @@ command, step and log line with timestamps).
 | `No Stagecraft link in …/link.json` | The client wasn't started with `STAGECRAFT_LINK=on`, Stagecraft isn't in its mods, or it is still loading (first windowed start downloads assets). |
 | Windowed client runs headless (no window) | It went through HeadlessMC: windowed clients must be started with `--window` / `windowed: true` (direct launch). |
 | `Missing library …` when starting a window | Launch one headless client first: windowed launches reuse HeadlessMC's downloads. |
+| Windows overlap, are cut off or land on another monitor | Check with `tools/hmc/windows.ps1`. Placement uses the **primary** monitor's work area; the client log says `Window placed in … content at x,y`. An old Stagecraft jar in the client (before the size-then-position fix) leaves windows centred. |
 | Veil/shader crash in headless clients | OpenGL-only mods go to windowed roles only (`--window-mods`). |
 | `/stagecraft run x` becomes `C:/Program Files/Git/…` | Git Bash path conversion: `MSYS_NO_PATHCONV=1`. |
 | `Instruction budget exceeded` | An infinite or very long Lua loop (10 M instructions). Waiting calls don't count — use them instead of busy loops. |
