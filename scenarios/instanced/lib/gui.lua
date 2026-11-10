@@ -8,6 +8,10 @@ function G.field(value)
   for n,w in ipairs(G.fields()) do if w.value==value then return n end end
   error('missing field with value '..value)
 end
+function G.label(pattern)
+  for n,w in ipairs(G.fields()) do if w.text:match(pattern) then return n end end
+  error('missing field labelled '..pattern)
+end
 function G.last(value) stage.set_field(#G.fields(),value) end
 function G.prompt(value)
   stage.wait_text('^Aceptar$|^Accept$'); G.last(value); stage.click_text('^Aceptar$|^Accept$')

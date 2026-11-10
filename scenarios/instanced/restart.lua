@@ -5,6 +5,7 @@
 --      --role A=HmcInstancedA run scenarios/instanced/restart.lua
 local I = require('instanced')
 
+local ok,failure=pcall(function()
 stage.step('dentro de la instancia', function()
   stage.command('gamemode creative')
   I.resetcap()
@@ -35,3 +36,7 @@ stage.step('reconectar tras reiniciar y cruzar un portal: sin teletransportes ro
   -- Leave the instance as the old scenario's client did on quit.
   I.tp('execute in minecraft:overworld run tp @s 0.5 100 -3.5')
 end)
+
+end)
+if stage.connected() then I.cleanup() end
+if not ok then error(failure,0) end

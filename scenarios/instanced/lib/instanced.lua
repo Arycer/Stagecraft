@@ -120,6 +120,17 @@ function M.ids(level)
   return ids
 end
 
+function M.active_id(level)
+  local found
+  for line in M.console('instanced instance list'):gmatch('[^\n]+') do
+    if line:find(level,1,true) and line:find('active · 1 dentro',1,true) then
+      assert(not found,'more than one occupied test instance for '..level)
+      found=line:match('([%da-f]+%-%x+%-%x+%-%x+%-%x+)')
+    end
+  end
+  return assert(found,'no occupied instance for '..level)
+end
+
 -- Preserve every unrelated setting, and return the original text for exact restoration.
 function M.json(value)
   if type(value)=='table' then
@@ -158,7 +169,16 @@ function M.dungeon(options)
   local ns=options.ns or ('sc_'..stage.run_id)
   local level=ns..':test'
   local c=M.portal(level)
-  local restore=M.config({instances_per_hour=options.cap or 1000,release_after_empty_minutes=options.release or 0})
+  local restore
+  function c.cleanup()
+    M.cleanup()
+    M.delete_namespace(ns)
+    if restore then restore() else M.reload() end
+    M.resetcap()
+    stage.command('execute in minecraft:overworld run fill 4 100 0 4 101 0 minecraft:air')
+  end
+  local ok,failure=pcall(function()
+    restore=M.config({instances_per_hour=options.cap or 1000,release_after_empty_minutes=options.release or 0})
   stage.host('file.write',{path=M.CONFIG..'schematics/'..ns..'/room.nbt',base64=require('fixtures').dungeon})
   M.write_level(level,'{"name":"Prueba Lua","dimension":{"type":'..M.TYPE..'},"schematic":{"file":"schematics/'..ns..'/room.nbt"},"grid":{"margin_chunks":0},"session":{"return_minutes":'..(options.returns or 0)..'}}')
   stage.command('gamemode creative')
@@ -166,17 +186,17 @@ function M.dungeon(options)
   M.resetcap()
   M.reload()
   M.wait_level(level..' activo .*dimensión loaded',60)
-  stage.command('instanced level pregen '..level..' 2')
-  stage.poll('instanced slot list '..level,'ready 2',60)
+  local slots=options.slots or 2
+  stage.command('instanced level pregen '..level..' '..slots)
+  stage.poll('instanced slot list '..level,'ready '..slots,60)
   stage.command('fill -3 99 -4 6 99 3 minecraft:stone')
   stage.command('fill 4 100 0 4 101 0 minecraft:air')
   stage.command('fill 4 100 0 4 101 0 instanced:entrance_portal{Level:"'..level..'",Exit:{Dimension:"minecraft:overworld",Pos:[0.5d,100.0d,0.5d],Yaw:0f,Pitch:0f}}')
-  function c.cleanup()
-    M.cleanup()
-    M.delete_namespace(ns)
-    restore()
-    M.resetcap()
-    stage.command('execute in minecraft:overworld run fill 4 100 0 4 101 0 minecraft:air')
+  end)
+  if not ok then
+    local cleaned,err=pcall(c.cleanup)
+    if not cleaned then stage.log("cleanup failed: "..tostring(err)) end
+    error(failure,0)
   end
   return c
 end

@@ -36,6 +36,13 @@ local ok,failure=pcall(function()
   end)
   local count=0; for _ in pairs(seen) do count=count+1 end
   stage.log(count..' translated texts inspected')
+  for text,where in pairs(seen) do
+    local suspect=text:find('[áéíóúñ¿¡]')
+    for _,word in ipairs({'nivel','niveles','fichero','guardar','borrar','jugador','instancias','salida','entrada','zona','marcador','tamaño','dentro','elige','vacío','vacía','una','los','las','del','de'}) do
+      if text:lower():find('%f[%a]'..word..'%f[%A]') then suspect=true end
+    end
+    if suspect then stage.log('Check Spanish-looking data/text ['..where..']: '..text) end
+  end
 end)
 if not ok then pcall(G.dump) end
 I.cleanup(function()
