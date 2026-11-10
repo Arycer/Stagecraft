@@ -72,6 +72,15 @@ class ApiV2Test {
         assertTrue(report.json().get("error").getAsString().contains("Library not found: nope"), report.json().toString());
     }
 
+    @Test void theSandboxHidesIoOsJavaAndLoaders() throws Exception {
+        RunReport report = run("sandbox", """
+                assert(stage.api_version == 2)
+                assert(io == nil and os == nil and luajava == nil and package == nil and load == nil and loadfile == nil and dofile == nil)
+                assert(type(require) == 'function' and type(string.format) == 'function')
+                """, Map.of());
+        assertEquals("passed", report.json().get("status").getAsString(), report.json().toString());
+    }
+
     @Test void aFailureOutsideStepsStillShowsInJunit() throws Exception {
         RunReport report = run("outside", "stage.step('ok', function() end)\nerror('late')", Map.of());
         assertTrue(report.junit().contains("tests=\"2\" failures=\"1\""), report.junit());

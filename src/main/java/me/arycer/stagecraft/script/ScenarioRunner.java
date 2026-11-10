@@ -21,6 +21,9 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 /**
  * Scenario catalog and lifecycle: one run at a time per client, on its own worker thread, with its report
@@ -38,6 +41,8 @@ public final class ScenarioRunner {
     private volatile String status = "idle";
     private volatile boolean cancelled;
     private volatile RunReport lastReport;
+    private final List<RunListener> listeners = new CopyOnWriteArrayList<>();
+    private static final int MAX_SOURCE_BYTES = 1_000_000;
 
     public ScenarioRunner(MinecraftClient client, Path scripts) throws IOException {
         this.client = client;
@@ -85,24 +90,44 @@ public final class ScenarioRunner {
         return !running.isAlive();
     }
 
-    public void start(String name, Origin origin) throws IOException {
-        start(name, origin, Map.of());
+    public String start(String name, Origin origin) throws IOException {
+        return start(name, origin, Map.of());
     }
 
-    public void start(String name, Origin origin, Map<String, String> args) throws IOException {
-        if (worker != null && worker.isAlive()) throw new IllegalStateException("A scenario is already running");
-        if (!name.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("Invalid scenario name");
+    /** Runs {@code scripts/<name>.lua}; returns the run id. */
+    public String start(String name, Origin origin, Map<String, String> args) throws IOException {
+        checkName(name);
         Path file = scripts.resolve(name + ".lua");
         if (!Files.isRegularFile(file) || Files.isSymbolicLink(file)) throw new IOException("Scenario not found: " + name);
-        if (Files.size(file) > 1_000_000) throw new IOException("Scenario exceeds 1 MB");
-        String source = Files.readString(file, StandardCharsets.UTF_8);
+        if (Files.size(file) > MAX_SOURCE_BYTES) throw new IOException("Scenario exceeds 1 MB");
+        return launch(name, "@" + file.getFileName(), Files.readString(file, StandardCharsets.UTF_8), origin, args);
+    }
+
+    /** Runs Lua sent by the link instead of a file (same sandbox, libraries and report); returns the run id. */
+    public String startInline(String name, String source, Origin origin, Map<String, String> args) throws IOException {
+        checkName(name);
+        if (source.getBytes(StandardCharsets.UTF_8).length > MAX_SOURCE_BYTES) throw new IOException("Scenario exceeds 1 MB");
+        return launch(name, "@" + name + ".lua", source, origin, args);
+    }
+
+    public void addListener(RunListener listener) {
+        listeners.add(listener);
+    }
+
+    private static void checkName(String name) {
+        if (!name.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("Invalid scenario name");
+    }
+
+    private synchronized String launch(String name, String chunk, String source, Origin origin, Map<String, String> args) throws IOException {
+        if (worker != null && worker.isAlive()) throw new IllegalStateException("A scenario is already running");
         Path reports = scripts.getParent().resolve("reports");
         Files.createDirectories(reports);
         Path base = reports.resolve(Instant.now().toString().replace(':', '-') + "-" + name);
         RunReport report = new RunReport(name, origin, args);
+        String runId = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         cancelled = false;
         ScriptContext context = new ScriptContext(client, origin, args, report,
-                new RunLog(base.resolveSibling(base.getFileName() + ".log")), chat, () -> cancelled);
+                new RunLog(base.resolveSibling(base.getFileName() + ".log")), chat, () -> cancelled, events, runId);
         current = context;
         status = "running " + name;
         worker = Thread.ofPlatform().daemon().name("stagecraft-script").unstarted(() -> {
@@ -110,7 +135,7 @@ public final class ScenarioRunner {
             String failure = null;
             try {
                 Globals globals = Sandbox.create(context, scripts.resolve("lib"), MODULES);
-                globals.load(source, "@" + file.getFileName()).call();
+                globals.load(source, chunk).call();
                 context.check();
                 result = RunReport.Status.PASSED;
                 status = "passed " + name;
@@ -125,9 +150,27 @@ public final class ScenarioRunner {
                 catch (IOException error) { System.err.println("[Stagecraft] Cannot write report: " + error.getMessage()); }
                 lastReport = report;
                 context.say(status);
+                events.finished(report);
             }
         });
+        events.started(name, runId);
         context.say(status + " at " + origin + (args.isEmpty() ? "" : " with " + args));
         worker.start();
+        return runId;
     }
+
+    /** Fans events out to the listeners; one that throws doesn't stop the others or the run. */
+    private final RunListener events = new RunListener() {
+        @Override public void started(String scenario, String runId) { each(l -> l.started(scenario, runId)); }
+        @Override public void log(String text) { each(l -> l.log(text)); }
+        @Override public void step(String name, RunReport.Status status, String error) { each(l -> l.step(name, status, error)); }
+        @Override public void finished(RunReport report) { each(l -> l.finished(report)); }
+
+        private void each(Consumer<RunListener> call) {
+            for (RunListener listener : listeners) {
+                try { call.accept(listener); }
+                catch (RuntimeException error) { System.err.println("[Stagecraft] Listener failed: " + error.getMessage()); }
+            }
+        }
+    };
 }

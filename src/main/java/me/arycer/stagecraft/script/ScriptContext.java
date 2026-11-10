@@ -36,6 +36,8 @@ public final class ScriptContext {
     private final RunLog log;
     private final ChatLog chat;
     private final BooleanSupplier cancelled;
+    private final RunListener listener;
+    private final String runId;
     private final long started = System.nanoTime();
     /** Messages up to this sequence are not matched by the next expectation. */
     private long cursor;
@@ -44,7 +46,7 @@ public final class ScriptContext {
     private final List<AutoCloseable> finishers = new ArrayList<>();
 
     ScriptContext(MinecraftClient client, Origin origin, Map<String, String> args, RunReport report, RunLog log,
-                  ChatLog chat, BooleanSupplier cancelled) {
+                  ChatLog chat, BooleanSupplier cancelled, RunListener listener, String runId) {
         this.client = client;
         this.origin = origin;
         this.args = Map.copyOf(args);
@@ -52,6 +54,8 @@ public final class ScriptContext {
         this.log = log;
         this.chat = chat;
         this.cancelled = cancelled;
+        this.listener = listener;
+        this.runId = runId;
         this.cursor = chat.mark();
     }
 
@@ -60,6 +64,8 @@ public final class ScriptContext {
     public Map<String, String> args() { return args; }
     public RunReport report() { return report; }
     public boolean cancelled() { return cancelled.getAsBoolean(); }
+    /** Unique per run: scripts use it for paths and ids ({@code stage.run_id}). */
+    public String runId() { return runId; }
     int commands() { return commands; }
     String currentCommand() { return currentCommand; }
 
@@ -92,8 +98,14 @@ public final class ScriptContext {
     /** A progress line: run log, standard output (HMC's console) and the player's chat. */
     public void say(String text) {
         log.append(text);
+        listener.log(text);
         System.out.println("[Stagecraft] " + text);
         if (client != null) client.execute(() -> { if (client.player != null) client.player.sendMessage(Text.literal("[Stagecraft] " + text), false); });
+    }
+
+    /** A step ended (see {@code stage.step}). */
+    public void stepEnded(String name, RunReport.Status status, String error) {
+        listener.step(name, status, error);
     }
 
     /** A line only for the run log. */

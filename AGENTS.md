@@ -20,6 +20,7 @@ Minecraft 1.21.1, Yarn 1.21.1+build.3, Java 21, Fabric Loader 0.18.4, Fabric API
 | `report` | `RunReport` (JSON, JUnit), `RunLog` (`.log`) | `placement` |
 | `examples` | `ExampleInstaller` | — |
 | `integration.instanced` | `InstancedBridge` (reflection; optional) | — |
+| `link` | `Link` (start, `link.json`), `LinkConfig` (off by default), `LinkServer` (WebSocket on 127.0.0.1 with token), `LinkProtocol` (requests and events, a `RunListener`) | `script`, `placement`, `report`, `chat` |
 | `gui` / `mixin` | `ScreenCapture` (text drawn per frame with its transformed box, only while a run holds a handle), `ScreenElements`, `ScreenKinds` (readable vanilla screen names; classes are intermediary in production), `Keys`; mixins on `DrawContext.drawText`, `GameRenderer.render`, `Screen.renderWithTooltip` | `mixin` → `gui` |
 
 `ArchitectureTest` enforces the table; a new package needs a row there. A new `stage.*` function goes in the
@@ -27,6 +28,6 @@ module of its area (or a new `StageModule` listed in `ScenarioRunner.MODULES`), 
 Tests mirror the packages; `ScenarioRunner` runs scripts without a client in tests (`ApiV2Test`).
 - Instanced is optional. Its adapter uses existing admin requests and preserves server-side permission/path validation.
 - Build and tests: `gradlew.bat build collectHeadlessMods`.
-- HMC verification: `HMC_HOME=... node tools/verify-hmc.mjs --fortress` (requires a connected creative admin client and local test server; see README).
+- HMC verification goes through the link: start the client with `STAGECRAFT_LINK=on`, then `HMC_HOME=... node tools/verify-hmc.mjs [--gui] [--fortress]` (requires a connected creative admin client and local test server; see README).
 - Examples are bundled; `ExampleInstaller` installs missing ones, updates copies the player never edited (SHA-256 in `.examples.properties`) and writes `<name>.lua.new` next to edited ones. `tools/port-fortress.mjs` is an offline migration helper; the emitted Lua has no Node dependency.
 - Do not execute example constructors on occupied areas; tests must preflight their own area and clean temporary processes.

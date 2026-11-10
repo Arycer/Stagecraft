@@ -97,25 +97,38 @@ Los nombres de archivo admiten letras ASCII, números, `_` y `-`. Las respuestas
 
 Hace falta Instanced **0.1.0** tanto en cliente como en servidor y sus dependencias. El adaptador está aislado y enlaza opcionalmente con `AdminClient.send`; no usa archivos del servidor ni añade permisos. Las versiones futuras de ese protocolo pueden requerir actualizar el adaptador: si `AdminClient` o su respuesta cambian, el guardado falla con un mensaje de versión incompatible. El límite de una definición es de 64 000 bytes en UTF-8. Los ejemplos `platform` y `smoke` no necesitan Instanced.
 
-## HeadlessMC
+## Enlace (WebSocket) y HeadlessMC
 
-No hace falta un escenario Node para ejecutar Lua: desde la consola de hmc-specifics se envía `/stagecraft run fortress`. Con el wrapper que ya usa este entorno:
+Un proceso externo (Node, un director de pruebas) puede controlar el cliente sin leer su `console.log`. El enlace está **apagado por defecto**. Se enciende con la variable de entorno `STAGECRAFT_LINK=on` (o un puerto) o con `config/stagecraft/link.properties` (`enabled=true`, `port=…`). Escucha solo en 127.0.0.1 y exige el token que publica en `config/stagecraft/link.json` (`port`, `token`, `pid`, `protocol`); el token es nuevo en cada arranque y el fichero se borra al cerrar.
+
+Protocolo JSON, una petición `{id, type, …}` y una respuesta `{id, type: "reply" | "error"}`:
+
+| Petición | Respuesta |
+|---|---|
+| `status` | `status`, `run_id`, `scenarios` |
+| `run` (`name`; `source` para Lua inline; `args`; `origin` con `dimension, x, y, z, yaw, pitch`, lo que falte sale del jugador) | `run_id` |
+| `cancel`, `command` (`command`, enviado como el jugador), `player` (`connected`, nombre, dimensión, posición) | — |
+
+Eventos para todas las conexiones `{type: "event", event, run_id}`: `started`, `log`, `step` (nombre, estado, error), `finished` (estado, error e informe JSON completo) y `chat` (texto y claves de traducción con sus argumentos).
+
+`tools/stagecraft-link.mjs` es el cliente Node, sin dependencias (WebSocket global de Node 22+): `connect(dirCliente)`, `run(nombre, {source, args, origin})` → `{status, error, report, logs, steps}`, `on(evento)`, `waitChat(regex | clave)`, `command`, `player`, `cancel`. También como CLI:
 
 ```powershell
-$env:HMC_MODS='C:\Users\conta\IdeaProjects\Stagecraft\build\headless-mods;C:\Users\conta\IdeaProjects\Instanced\fabric-client\build\headless-mods'
+$env:STAGECRAFT_LINK='on'
+$env:HMC_MODS='C:UserscontaIdeaProjectsStagecraftuildheadless-mods;C:UserscontaIdeaProjectsInstancedabric-clientuildheadless-mods'
 $env:HMC_VERSION='fabric-loader-0.18.4-1.21.1'
 node hmc.mjs start HmcInstancedA
 # Desde otra consola:
 node hmc.mjs send HmcInstancedA 'connect localhost 25571'
-node hmc.mjs send HmcInstancedA '/stagecraft run fortress'
-node hmc.mjs stop HmcInstancedA
+node tools/stagecraft-link.mjs <mc-headless>/client-HmcInstancedA run platform size=5
+node tools/stagecraft-link.mjs <mc-headless>/client-HmcInstancedA run-file mi-escenario.lua
 ```
 
-El perfil Fabric debe estar instalado en HeadlessMC. El cliente tiene sus propios scripts en `client-HmcInstancedA/config/stagecraft/scripts/`. Para usar solo Stagecraft, basta con su carpeta `build/headless-mods` y hmc-specifics; fortress añade el requisito de Instanced.
+Sin enlace, desde la consola de hmc-specifics se puede seguir enviando `/stagecraft run …`. El perfil Fabric debe estar instalado en HeadlessMC.
 
 ## Verificación de desarrollo
 
-`gradlew.bat build` ejecuta las pruebas de origen y compilación de todos los ejemplos Lua. `tools/verify-hmc.mjs` comprueba un cliente HMC ya conectado, creativo y OP en un servidor de pruebas: origen relativo/fijo/orientado, dimensión explícita, errores, cancelación, límite de instrucciones y opcionalmente fortress completo con portal. Escribe `build/hmc-verification.json`.
+`gradlew.bat build` ejecuta las pruebas de origen y compilación de todos los ejemplos Lua. `tools/verify-hmc.mjs` comprueba por el enlace un cliente HMC ya conectado (con `STAGECRAFT_LINK=on`), creativo y OP en un servidor de pruebas; `--gui` añade el ejemplo `gui`: origen relativo/fijo/orientado, dimensión explícita, errores, cancelación, límite de instrucciones y opcionalmente fortress completo con portal. Escribe `build/hmc-verification.json`.
 
 ```powershell
 $env:HMC_HOME='C:\Users\conta\Documents\mc-test-tools\mc-headless'

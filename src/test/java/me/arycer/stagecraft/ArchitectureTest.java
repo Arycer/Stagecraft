@@ -33,7 +33,8 @@ class ArchitectureTest {
             Map.entry("mixin", Set.of("gui")),
             Map.entry("script", Set.of("script.api", "chat", "report", "placement")),
             Map.entry("script.api", Set.of("script", "chat", "report", "placement", "integration.instanced", "gui")),
-            Map.entry("command", Set.of("script", "placement")));
+            Map.entry("command", Set.of("script", "placement")),
+            Map.entry("link", Set.of("script", "placement", "report", "chat")));
 
     @Test void packagesOnlyImportWhatTheyAreAllowedTo() throws IOException {
         List<String> violations = new ArrayList<>();

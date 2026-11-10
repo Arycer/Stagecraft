@@ -9,8 +9,6 @@ import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.Varargs;
 
-import java.util.UUID;
-
 import static me.arycer.stagecraft.script.api.StageModule.function;
 
 /** {@code api_version}, {@code run_id}, {@code args}, {@code origin}, {@code command}, {@code world}, {@code wait}, {@code log}, {@code step}. */
@@ -21,7 +19,7 @@ public final class CoreModule implements StageModule {
     public void install(LuaTable stage, ScriptContext context) {
         Origin origin = context.origin();
         stage.set("api_version", API_VERSION);
-        stage.set("run_id", UUID.randomUUID().toString().replace("-", "").substring(0, 12));
+        stage.set("run_id", context.runId());
         LuaTable args = new LuaTable();
         context.args().forEach((key, value) -> args.set(key, LuaValue.valueOf(value)));
         stage.set("args", args);
@@ -62,11 +60,14 @@ public final class CoreModule implements StageModule {
         try {
             Varargs result = body.invoke();
             report.endStep(RunReport.Status.PASSED, null);
+            context.stepEnded(name, RunReport.Status.PASSED, null);
             context.say("ok " + name);
             return result;
         } catch (RuntimeException | StackOverflowError error) {
             String failure = Failures.describe(error, 0);
-            report.endStep(context.cancelled() ? RunReport.Status.CANCELLED : RunReport.Status.FAILED, failure);
+            RunReport.Status status = context.cancelled() ? RunReport.Status.CANCELLED : RunReport.Status.FAILED;
+            report.endStep(status, failure);
+            context.stepEnded(name, status, failure);
             context.say("FAIL " + name + ": " + failure);
             throw error;
         }

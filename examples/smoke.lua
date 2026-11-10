@@ -1,6 +1,6 @@
 -- Creative admin required. Use an empty loaded area; the two temporary blocks are removed.
-assert(stage.api_version == 1)
-assert(io == nil and os == nil and luajava == nil and package == nil and require == nil)
+assert(stage.api_version >= 2)
+assert(io == nil and os == nil and luajava == nil and package == nil and load == nil and dofile == nil and type(require) == 'function')
 stage.fly(true)
 stage.assert_dimension(stage.origin.dimension)
 stage.assert_empty(2, 0, 0, 3, 0, 0)
