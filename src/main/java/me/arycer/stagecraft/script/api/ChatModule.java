@@ -7,6 +7,7 @@ import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.Varargs;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -14,7 +15,7 @@ import java.util.regex.Pattern;
 
 import static me.arycer.stagecraft.script.api.StageModule.function;
 
-/** {@code expect_chat}, {@code expect_key}, {@code poll} and {@code poll_key}. */
+/** {@code expect_chat}, {@code expect_all}, {@code expect_key}, {@code poll} and {@code poll_key}. */
 public final class ChatModule implements StageModule {
     @Override
     public void install(LuaTable stage, ScriptContext context) {
@@ -23,6 +24,7 @@ public final class ChatModule implements StageModule {
             return LuaValue.valueOf(context.awaitMessage(byText(pattern), ScriptContext.seconds(a, 2, 15, 120))
                     .orElseThrow(() -> new LuaError("No chat matching " + pattern)).text());
         }));
+        stage.set("expect_all", function(a -> expectAll(context, a)));
         stage.set("expect_key", function(a -> {
             String key = a.checkjstring(1);
             return message(context.awaitMessage(byKey(key), ScriptContext.seconds(a, 2, 15, 120))
@@ -40,6 +42,40 @@ public final class ChatModule implements StageModule {
             return message(poll(context, command, byKey(key), a)
                     .orElseThrow(() -> new LuaError("Timed out polling " + command + " for key " + key)), key);
         }));
+    }
+
+    /**
+     * {@code expect_all({regex, …}, seconds=15)}: every pattern matches some message after the cursor, in any
+     * order (as waiting for several lines from the same point). Returns the texts in pattern order; the
+     * cursor moves past the latest match.
+     */
+    private static LuaValue expectAll(ScriptContext context, Varargs a) {
+        LuaTable patterns = a.checktable(1);
+        double seconds = ScriptContext.seconds(a, 2, 15, 120);
+        List<Pattern> compiled = new ArrayList<>();
+        for (int i = 1; i <= patterns.length(); i++) compiled.add(Pattern.compile(patterns.get(i).checkjstring()));
+        long from = context.cursor();
+        ChatLog.Entry[] found = new ChatLog.Entry[compiled.size()];
+        boolean all = context.awaitCondition(() -> {
+            for (int i = 0; i < compiled.size(); i++) {
+                if (found[i] == null) found[i] = context.chat().find(from, byText(compiled.get(i))).orElse(null);
+            }
+            for (ChatLog.Entry entry : found) if (entry == null) return false;
+            return true;
+        }, seconds);
+        if (!all) {
+            List<String> missing = new ArrayList<>();
+            for (int i = 0; i < found.length; i++) if (found[i] == null) missing.add(compiled.get(i).pattern());
+            throw new LuaError("No chat matching " + String.join(", ", missing));
+        }
+        LuaTable texts = new LuaTable();
+        long last = from;
+        for (int i = 0; i < found.length; i++) {
+            texts.set(i + 1, LuaValue.valueOf(found[i].text()));
+            last = Math.max(last, found[i].sequence());
+        }
+        context.moveCursor(last);
+        return texts;
     }
 
     private static Predicate<ChatLog.Entry> byText(Pattern pattern) {

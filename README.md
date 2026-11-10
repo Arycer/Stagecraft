@@ -36,6 +36,7 @@ Para fortress, sitúate sobre el suelo y mira hacia la zona de construcción. El
 | `stage.command(texto)` | Comando normal, con o sin `/`; intervalo de 150 ms. |
 | `stage.world(texto)` | Comando en el origen guardado. |
 | `stage.wait(segundos)` | Espera de 0 a 120 segundos sin bloquear el juego. |
+| `stage.expect_all({regex, …}, segundos=15)` | Espera a que todos los patrones aparezcan después del último comando, en cualquier orden; devuelve los textos. |
 | `stage.expect_chat(regex, segundos=15)` | Espera un mensaje recibido desde el último comando; consume el mensaje encontrado. Regex de Java, máximo 120 segundos. |
 | `stage.assert_dimension(id)` | Comprueba la dimensión actual del jugador. |
 | `stage.assert_block(x,y,z,id)` | Comprueba un bloque por desplazamiento respecto al origen; exige chunk cargado en el cliente. |
@@ -158,5 +159,17 @@ node tools/verify-hmc.mjs --fortress
 Ese verificador usa zonas vacías del servidor de desarrollo; no debe ejecutarse en producción. `FORTRESS_X` cambia la coordenada x/z de la construcción de prueba (8448 por defecto). Los scripts temporales del verificador se eliminan; la construcción y sus datos quedan para inspección hasta que se limpien explícitamente.
 
 Para repetir las comprobaciones del portal de la última fortaleza sin reconstruirla, usar `--fortress --reuse-fortress` mientras existan los datos del último informe.
+
+### Portar escenarios antiguos
+
+`node tools/port-scenario.mjs <escenario>.mjs <salida>.lua [-- modo]` ejecuta un escenario de `mc-headless` sin Minecraft, con un cliente que graba y la carpeta del servidor interceptada, y escribe un borrador Lua para el director:
+- cada `step()` pasa a `stage.step`;
+- `run` y `waitFor` pasan a `command` + `expect_chat`, y varias esperas desde el mismo `since` pasan a `stage.expect_all`;
+- `key`, `close` y `click p` se traducen a la API de GUI;
+- los ficheros del servidor pasan a `stage.host` (los binarios en base64);
+- varios clientes pasan a roles, con señales que conservan el orden;
+- el `finally` del original pasa a una limpieza que también se ejecuta tras un fallo.
+
+Lo que depende de la salida (pantallas leídas con `render`, coordenadas calculadas, bucles de sondeo o un paso que falla al grabar) queda marcado como `TODO`. El estado del port está en `mc-headless/stagecraft/README.md`.
 
 `tools/port-fortress.mjs` documenta la migración desde el escenario Node original y genera el Lua incluido. Es una herramienta de desarrollo; no se necesita para ejecutar el mod.

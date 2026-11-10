@@ -24,3 +24,17 @@ Mod nuevo e independiente en `IdeaProjects/Stagecraft`, solo para cliente, para 
 Ver [verification.md](verification.md) para entorno, comandos y evidencias. No quedan tareas de implementación de esta primera versión.
 
 Las pruebas de varios jugadores siguen requiriendo varios clientes o pruebas de servidor: un script cliente no representa otras cuentas. Fortress se orienta horizontalmente al cardinal más cercano y se coloca sobre el suelo delante/derecha del jugador, transformando también estados de bloques y cajas NBT. El origen sigue fijo durante toda la ejecución. Los nombres de escenarios se sugieren dinámicamente en `/stagecraft run`.
+
+## Ampliación (10/11/2026)
+
+Hecho y comprobado con clientes HMC reales contra el servidor de desarrollo de Instanced:
+
+1. API Lua v2: pasos, claves de traducción, sondeo, argumentos, librerías e informes JSON/JUnit.
+2. API de GUI: texto dibujado con coordenadas transformadas, widgets, clics, teclas y campos.
+3. Enlace WebSocket (apagado por defecto, con token) y cliente Node; `verify-hmc.mjs` va por el enlace.
+4. Host de servidor (mismo jar, apagado por defecto) para ficheros y estado; señales, roles y director de varios clientes.
+5. `tools/port-scenario.mjs`; `config` y `tpa` portados y pasando, el resto como borradores (`mc-headless/stagecraft/README.md`).
+
+Pendiente:
+- Que el director reinicie el servidor, para `restart`, `rejoin` y los modos de `dimensions`/`slots`.
+- Terminar los borradores, sobre todo los de GUI: sus lecturas de `render` pasan a `wait_text`/`click_text`.

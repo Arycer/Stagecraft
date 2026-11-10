@@ -171,6 +171,13 @@ public final class ScriptContext {
         catch (Exception error) { throw new LuaError(prefix + Failures.describe(error, CLIENT_TIMEOUT_SECONDS)); }
     }
 
+    /** Messages after this sequence are the ones the next expectation sees. */
+    public long cursor() { return cursor; }
+
+    public void moveCursor(long sequence) { cursor = Math.max(cursor, sequence); }
+
+    public ChatLog chat() { return chat; }
+
     /** The first message after the cursor that matches, within {@code seconds}; it becomes the new cursor. */
     public Optional<ChatLog.Entry> awaitMessage(Predicate<ChatLog.Entry> matcher, double seconds) {
         long until = System.nanoTime() + (long) (seconds * 1_000_000_000);

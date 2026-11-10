@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -137,7 +138,9 @@ public final class HostFunctions {
         Path path = files.resolve(string(args, "path"));
         if (path.equals(files.root())) throw new IllegalArgumentException("Cannot write the host root");
         Files.createDirectories(path.getParent());
-        byte[] bytes = string(args, "text").getBytes(StandardCharsets.UTF_8);
+        // Text as UTF-8, or binary content (an .nbt fixture) as base64.
+        byte[] bytes = args.has("base64") ? Base64.getDecoder().decode(string(args, "base64"))
+                : string(args, "text").getBytes(StandardCharsets.UTF_8);
         if (append) Files.write(path, bytes, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         else Files.write(path, bytes);
         JsonObject result = new JsonObject();

@@ -36,7 +36,10 @@ public final class HostModule implements StageModule {
             JsonObject object = args.getAsJsonObject();
             if (name.equals("file.write") && object.has("text")
                     && object.get("text").getAsString().getBytes(StandardCharsets.UTF_8).length > CHUNK_BYTES) {
-                return chunkedWrite(context, object);
+                return chunkedWrite(context, object, "text", split(object.get("text").getAsString()));
+            }
+            if (name.equals("file.write") && object.has("base64") && object.get("base64").getAsString().length() > CHUNK_BYTES) {
+                return chunkedWrite(context, object, "base64", splitBase64(object.get("base64").getAsString()));
             }
             return call(context, name, object);
         }));
@@ -53,15 +56,22 @@ public final class HostModule implements StageModule {
         }
     }
 
-    private static LuaValue chunkedWrite(ScriptContext context, JsonObject args) {
+    private static LuaValue chunkedWrite(ScriptContext context, JsonObject args, String field, List<String> chunks) {
         LuaValue result = LuaValue.NIL;
-        List<String> chunks = split(args.get("text").getAsString());
         for (int i = 0; i < chunks.size(); i++) {
             JsonObject part = args.deepCopy();
-            part.addProperty("text", chunks.get(i));
+            part.addProperty(field, chunks.get(i));
             result = call(context, i == 0 ? "file.write" : "file.append", part);
         }
         return result;
+    }
+
+    /** Base64 split on 4-character groups, so every piece decodes on its own. */
+    static List<String> splitBase64(String base64) {
+        List<String> chunks = new ArrayList<>();
+        int size = CHUNK_BYTES - CHUNK_BYTES % 4;
+        for (int i = 0; i < base64.length(); i += size) chunks.add(base64.substring(i, Math.min(base64.length(), i + size)));
+        return chunks;
     }
 
     /** Splits on code point boundaries into pieces of at most {@link #CHUNK_BYTES} UTF-8 bytes. */
