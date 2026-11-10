@@ -1,27 +1,30 @@
 package me.arycer.stagecraft;
 
+import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.command.argument.IdentifierArgumentType;
 import net.minecraft.command.CommandSource;
+import net.minecraft.command.argument.IdentifierArgumentType;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
-import java.nio.file.Files;
 import java.util.List;
+import java.util.Map;
 
 public final class StagecraftClient implements ClientModInitializer {
+    private static final String USAGE = "/stagecraft list | run <name> [[in <dimension>] at <x> <y> <z> [facing <yaw> <pitch>]] [with key=value …] | status | cancel";
     private ScenarioRunner runner;
 
     @Override public void onInitializeClient() {
@@ -34,21 +37,21 @@ public final class StagecraftClient implements ClientModInitializer {
             if (!outcome.kept().isEmpty()) System.out.println("[Stagecraft] Edited examples kept; new versions in <name>.lua.new: " + String.join(", ", outcome.kept()));
         }
         catch (Exception error) { throw new IllegalStateException("Cannot create Stagecraft script directory", error); }
-        ClientReceiveMessageEvents.GAME.register((message, overlay) -> runner.message(message.getString()));
+        ClientReceiveMessageEvents.GAME.register((message, overlay) -> runner.message(message.getString(), TextKeys.of(message)));
+        ClientReceiveMessageEvents.CHAT.register((message, signed, sender, params, timestamp) -> runner.message(message.getString(), TextKeys.of(message)));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, disconnected) -> runner.cancel());
         ClientLifecycleEvents.CLIENT_STOPPING.register(stopping -> runner.cancel());
-        ClientReceiveMessageEvents.CHAT.register((message, signed, sender, params, timestamp) -> runner.message(message.getString()));
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, access) -> {
-            var scenario = ClientCommandManager.argument("name", StringArgumentType.word())
-                    .suggests((context, builder) -> CommandSource.suggestMatching(runner.scenarios(), builder))
-                    .executes(context -> run(context, StringArgumentType.getString(context, "name"), currentOrigin(client)))
+            var scenario = withArgs(ClientCommandManager.argument("name", StringArgumentType.word())
+                    .suggests((context, builder) -> CommandSource.suggestMatching(runner.scenarios(), builder)),
+                    context -> run(context, currentOrigin(client)))
                     .then(ClientCommandManager.literal("at").then(position(false)))
                     .then(ClientCommandManager.literal("in").then(ClientCommandManager.argument("dimension", IdentifierArgumentType.identifier())
                             .then(ClientCommandManager.literal("at").then(position(true)))));
             dispatcher.register(
                 ClientCommandManager.literal("stagecraft")
                         .executes(context -> {
-                            context.getSource().sendFeedback(Text.literal("/stagecraft list | run <name> [in <dimension>] at <x> <y> <z> [facing <yaw> <pitch>] | status | cancel"));
+                            context.getSource().sendFeedback(Text.literal(USAGE));
                             return 1;
                         })
                         .then(ClientCommandManager.literal("status").executes(context -> {
@@ -56,22 +59,24 @@ public final class StagecraftClient implements ClientModInitializer {
                         }))
                         .then(ClientCommandManager.literal("cancel").executes(context -> { runner.cancel(); return 1; }))
                         .then(ClientCommandManager.literal("list").executes(context -> {
-                            try (var files = Files.list(runner.scripts())) {
-                                context.getSource().sendFeedback(Text.literal(String.join(", ", files
-                                        .map(p -> p.getFileName().toString()).filter(n -> n.endsWith(".lua")).sorted().toList())));
-                            } catch (Exception error) { context.getSource().sendError(Text.literal(error.getMessage())); }
+                            context.getSource().sendFeedback(Text.literal(String.join(", ", runner.scenarios())));
                             return 1;
                         }))
                         .then(ClientCommandManager.literal("run").then(scenario)));
         });
     }
 
+    /** The node runs the scenario, and so does the node followed by {@code with <key=value …>}. */
+    private static <T extends ArgumentBuilder<FabricClientCommandSource, T>> T withArgs(T node, Command<FabricClientCommandSource> command) {
+        return node.executes(command)
+                .then(ClientCommandManager.literal("with").then(ClientCommandManager.argument("args", StringArgumentType.greedyString()).executes(command)));
+    }
+
     private RequiredArgumentBuilder<FabricClientCommandSource, Double> position(boolean dimension) {
-        var z = ClientCommandManager.argument("z", DoubleArgumentType.doubleArg())
-                .executes(context -> runAt(context, dimension, false))
+        var z = withArgs(ClientCommandManager.argument("z", DoubleArgumentType.doubleArg()), context -> runAt(context, dimension, false))
                 .then(ClientCommandManager.literal("facing").then(ClientCommandManager.argument("yaw", FloatArgumentType.floatArg())
-                        .then(ClientCommandManager.argument("pitch", FloatArgumentType.floatArg(-90, 90))
-                                .executes(context -> runAt(context, dimension, true)))));
+                        .then(withArgs(ClientCommandManager.argument("pitch", FloatArgumentType.floatArg(-90, 90)),
+                                context -> runAt(context, dimension, true)))));
         return ClientCommandManager.argument("x", DoubleArgumentType.doubleArg())
                 .then(ClientCommandManager.argument("y", DoubleArgumentType.doubleArg()).then(z));
     }
@@ -79,23 +84,27 @@ public final class StagecraftClient implements ClientModInitializer {
     private int runAt(CommandContext<FabricClientCommandSource> context, boolean dimension, boolean facing) {
         Origin current = currentOrigin(MinecraftClient.getInstance());
         String world = dimension ? context.getArgument("dimension", Identifier.class).toString() : current.dimension();
-        if (Identifier.tryParse(world) == null) {
-            context.getSource().sendError(Text.literal("Invalid dimension: " + world));
-            return 0;
-        }
-        return run(context, StringArgumentType.getString(context, "name"), new Origin(world,
+        return run(context, new Origin(world,
                 DoubleArgumentType.getDouble(context, "x"), DoubleArgumentType.getDouble(context, "y"), DoubleArgumentType.getDouble(context, "z"),
                 facing ? FloatArgumentType.getFloat(context, "yaw") : current.yaw(),
                 facing ? FloatArgumentType.getFloat(context, "pitch") : current.pitch()));
     }
 
-    private int run(CommandContext<FabricClientCommandSource> context, String name, Origin origin) {
-        try { runner.start(name, origin); return 1; }
-        catch (Exception error) {
+    private int run(CommandContext<FabricClientCommandSource> context, Origin origin) {
+        try {
+            runner.start(StringArgumentType.getString(context, "name"), origin, args(context));
+            return 1;
+        } catch (Exception error) {
             context.getSource().sendError(Text.literal("[Stagecraft] " + ScenarioRunner.describe(error, 0)));
             return 0;
         }
     }
+
+    private static Map<String, String> args(CommandContext<FabricClientCommandSource> context) {
+        boolean given = context.getNodes().stream().anyMatch(node -> node.getNode().getName().equals("args"));
+        return given ? ScenarioArgs.parse(StringArgumentType.getString(context, "args")) : Map.of();
+    }
+
     private Origin currentOrigin(MinecraftClient client) {
         var player = client.player;
         return new Origin(client.world.getRegistryKey().getValue().toString(), player.getX(), player.getY(), player.getZ(), player.getYaw(), player.getPitch());

@@ -16,6 +16,7 @@ Los comandos se envían como el jugador conectado, con sus permisos normales. Pa
 - `/stagecraft run fortress`: guarda tu posición, dimensión y orientación al iniciar.
 - `/stagecraft run fortress at 100 80 100`: fija las coordenadas en tu dimensión actual.
 - `/stagecraft run fortress in assets:world at 100 80 100`: fija también la dimensión.
+- `/stagecraft run platform with size=5 block="minecraft:stone"`: pasa argumentos al script (`stage.args`); `with` va siempre al final, también tras `at` o `facing`.
 - `/stagecraft run platform at 100 80 100 facing 90 0`: fija yaw y pitch.
 - `/stagecraft status`: estado y comando actual.
 - `/stagecraft cancel`: cancela el trabajo pendiente. Lo ya construido o guardado no se deshace.
@@ -26,7 +27,9 @@ Para fortress, sitúate sobre el suelo y mira hacia la zona de construcción. El
 
 `/stagecraft run <Tab>` sugiere los scripts `.lua` válidos de la carpeta, sin extensión. La lista se actualiza cuando añades o eliminas archivos, sin reiniciar. Si editaste un ejemplo y quieres la versión nueva, copia `<nombre>.lua.new` sobre `<nombre>.lua`; a partir de ahí vuelve a actualizarse solo.
 
-## API Lua v1
+## API Lua v2
+
+`stage.api_version` es `2`. Todo lo de la v1 sigue igual.
 
 | Función | Uso |
 |---|---|
@@ -43,6 +46,14 @@ Para fortress, sitúate sobre el suelo y mira hacia la zona de construcción. El
 | `stage.run_id` | Identificador único de la ejecución para generar rutas e IDs. |
 | `stage.instanced_save_pool(ruta,json)` | Adaptador opcional: guarda una pool por el protocolo de administración de Instanced. |
 | `stage.instanced_save_level(id,json)` | Adaptador opcional: guarda un nivel por el mismo protocolo. |
+| `stage.step(nombre, fn)` | Ejecuta `fn` como un paso con nombre: `ok`/`FAIL` en chat e informe, un caso JUnit por paso. Se pueden anidar (`exterior / interior`). Un fallo se propaga. |
+| `stage.expect_key(clave, segundos=15)` | Como `expect_chat`, pero por clave de traducción (`chat.instanced.…`, `command.unknown.command`): no depende del idioma. Devuelve `{text, key, args}`; busca también en argumentos y hermanos del mensaje. |
+| `stage.poll(cmd, regex, segundos=30, intervalo=1)` | Reenvía `cmd` cada intervalo hasta que una respuesta coincide; devuelve el texto. |
+| `stage.poll_key(cmd, clave, segundos=30, intervalo=1)` | Igual, por clave; devuelve `{text, key, args}`. |
+| `stage.player()` | `{name, x, y, z, yaw, pitch, dimension, gamemode, health, food, flying, on_ground, selected_slot}`. |
+| `stage.inventory()` | Lista de `{slot, id, count}` de las ranuras no vacías (índices del inventario vanilla). |
+| `stage.args` | Tabla de `/stagecraft run <nombre> … with clave=valor otra="con espacios"` (siempre strings). |
+| `require(nombre)` | Carga `scripts/lib/<a>/<b>.lua` para `require('a.b')`, una vez por ejecución; nada fuera de `lib/`. |
 
 Ejemplo de construcción relativa:
 
@@ -55,9 +66,9 @@ stage.assert_block(0, 0, 0, 'minecraft:smooth_stone')
 stage.log('Plataforma lista')
 ```
 
-Hay base Lua, tablas, strings y matemáticas. No se exponen IO, OS, Java, módulos ni carga arbitraria de archivos. Los scripts son código local de confianza: regex y asignaciones de memoria de la JVM no constituyen un aislamiento frente a código hostil. Se limita la ejecución Lua a 10 millones de instrucciones y 15 minutos; se cancela al desconectar o cerrar el cliente. Un comando enviado sin una comprobación posterior no demuestra que el servidor lo haya aceptado.
+Hay base Lua, tablas, strings y matemáticas. No se exponen IO, OS ni Java; `require` solo carga librerías de `scripts/lib/`. Los scripts son código local de confianza: regex y asignaciones de memoria de la JVM no constituyen un aislamiento frente a código hostil. Se limita la ejecución Lua a 10 millones de instrucciones y 15 minutos; se cancela al desconectar o cerrar el cliente. Un comando enviado sin una comprobación posterior no demuestra que el servidor lo haya aceptado.
 
-Los informes UTF-8 se guardan en `config/stagecraft/reports/` con fecha, nombre, comandos y resultado. Los errores Lua incluyen archivo y línea.
+Los informes se guardan en `config/stagecraft/reports/` con fecha y nombre: `.log` (traza de comandos y mensajes), `.json` (estado, origen, argumentos, número de comandos y pasos con su duración y error) y `.xml` en formato JUnit, uno por ejecución, para CI. Los errores Lua incluyen archivo y línea.
 
 Los nombres de archivo admiten letras ASCII, números, `_` y `-`. Las respuestas del servidor pueden depender del idioma del cliente; las esperas de fortress contemplan español e inglés.
 
