@@ -25,3 +25,7 @@ command, step and log line with timestamps).
 | A run hangs on `wait_signal` | Another role failed or never raised the signal. Give every `wait_signal` a timeout shorter than the run; check the other role's `FAIL`. |
 | `A scenario is already running` | A previous run on that client is still going: `link.cancel()` / `/stagecraft cancel`, or wait. |
 | Leftover state breaks the next run | Clean up after `pcall`, use `stage.run_id` in names, and reset what the scenario changed (gamemode, position, files). |
+
+- Long paths/IDs may be clipped with `…` or split over several drawn strings. Assert a visible prefix plus server-side output, not a whole long sentence. Use an explicit GUI scale in test launches.
+- A button can be present but disabled (Respawn for its first 20 ticks): wait until it can be clicked. Check health after a failed death scenario before reusing the client.
+- `custom_payload … bytes extra` with optional client mods usually means mismatched client/server jars even when their version strings are equal. Rebuild the production jar from the same source as the server's dev runtime, then restart the affected clients.

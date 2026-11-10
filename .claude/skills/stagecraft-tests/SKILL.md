@@ -89,3 +89,7 @@ Everything that depended on reading output is a `TODO`. Finish those by hand (se
 | `scenarios/` | Finished scenarios (`duo.lua`; `instanced/` for the Instanced mod, with drafts) |
 | `run/hmc/` | Launcher, shared `.minecraft`, client game dirs (git-ignored) |
 | `examples/` | Single-client examples bundled into the mod (`platform`, `smoke`, `gui`, `fortress`) |
+
+## Full Instanced migration suite
+
+Use `tools/verify-instanced.mjs --party-mods <Parties client jars>` for the complete 26-scenario suite (windows by default, `--headless` for development). It groups roles and languages and retains dated reports. See `scenarios/instanced/README.md` for preparation, required jars, retained construction fixtures and the verification record. Prefer widget labels over ordinal guesses when a custom screen registers fields from hidden tabs.

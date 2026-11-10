@@ -86,7 +86,7 @@ stage.assert_block(0, 0, 0, 'minecraft:smooth_stone')
 stage.log('Plataforma lista')
 ```
 
-Hay base Lua, tablas, strings y matemáticas. No se exponen IO, OS ni Java; `require` solo carga librerías de `scripts/lib/`. Los scripts son código local de confianza: regex y asignaciones de memoria de la JVM no constituyen un aislamiento frente a código hostil. Se limita la ejecución Lua a 10 millones de instrucciones y 15 minutos; se cancela al desconectar o cerrar el cliente. Un comando enviado sin una comprobación posterior no demuestra que el servidor lo haya aceptado.
+Hay base Lua, tablas, strings y matemáticas. No se exponen IO, OS ni Java; `require` solo carga librerías de `scripts/lib/`. Los scripts son código local de confianza: regex y asignaciones de memoria de la JVM no constituyen un aislamiento frente a código hostil. Se limita la ejecución Lua a 10 millones de instrucciones y 15 minutos; se cancela ante una desconexión imprevista o al cerrar el cliente. Un comando enviado sin una comprobación posterior no demuestra que el servidor lo haya aceptado.
 
 Los informes se guardan en `config/stagecraft/reports/` con fecha y nombre: `.log` (traza de comandos y mensajes), `.json` (estado, origen, argumentos, número de comandos y pasos con su duración y error) y `.xml` en formato JUnit, uno por ejecución, para CI. Los errores Lua incluyen archivo y línea.
 
@@ -153,7 +153,7 @@ Protocolo completo: [director.md](.claude/skills/stagecraft-tests/references/dir
 
 ### Escenarios
 
-`scenarios/` guarda escenarios terminados: `duo.lua` (host + señales con dos clientes) e `instanced/` (los de Instanced, portados de `mc-headless`, con borradores en `drafts/`). Los escenarios `.mjs` antiguos siguen en `Documents/mc-test-tools/mc-headless`, donde `hmc.mjs` es ahora un shim que apunta a `tools/hmc/hmc.mjs`.
+`scenarios/` guarda escenarios terminados: `duo.lua` (host + señales con dos clientes) e `instanced/` (26 escenarios de Instanced portados de `mc-headless`). Los escenarios `.mjs` antiguos siguen en `Documents/mc-test-tools/mc-headless`, donde `hmc.mjs` es ahora un shim que apunta a `tools/hmc/hmc.mjs`.
 
 ## Verificación de desarrollo
 
@@ -181,3 +181,9 @@ Para repetir las comprobaciones del portal de la última fortaleza sin reconstru
 Lo que depende de la salida (pantallas leídas con `render`, coordenadas calculadas, bucles de sondeo o un paso que falla al grabar) queda marcado como `TODO`. El estado del port está en `scenarios/instanced/README.md`.
 
 `tools/port-fortress.mjs` documenta la migración desde el escenario Node original y genera el Lua incluido. Es una herramienta de desarrollo; no se necesita para ejecutar el mod.
+
+### Suite completa de Instanced
+
+`node tools/verify-instanced.mjs --party-mods build/party-client-mods` ejecuta los 26 escenarios migrados con ventanas visibles, agrupados por 1, 2 y 4 roles y con una tanda en inglés. Incluye reinicios reales del servidor. `--headless` permite desarrollar sin ventanas; `--only a,b` y `--group single|english|duo|party` seleccionan subconjuntos. Preparación, dependencias y cobertura: [scenarios/instanced/README.md](scenarios/instanced/README.md).
+
+El director también acepta varios archivos tras `run`, `--lang en_us` y `--server-start "<comando>" --server-cwd <carpeta>`. `stage.disconnect/connect/restart_server` mantienen la ejecución durante salidas esperadas; `stage.mods()` expone las versiones del cliente. El director copia las carpetas `lib/` y `fixtures/` de los escenarios y pasa las cuentas en `stage.args.client_A`, etc. Los informes completos de la suite se conservan en `build/instanced-suite-<fecha>/`.

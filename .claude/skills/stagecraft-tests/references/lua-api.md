@@ -102,7 +102,7 @@ Instanced's admin protocol (permission-checked by Instanced). Only when Instance
 
 `require('a.b')` loads `scripts/lib/a/b.lua` once per run and returns its value. In director runs the source is
 sent inline but `require` still reads the *client's* `scripts/lib/`, so prefer self-contained scenarios or copy
-the libraries into the clients' `config/stagecraft/scripts/lib/`.
+the libraries into the clients' `config/stagecraft/scripts/lib/`. The director copies a sibling `lib/` (or the parent's for drafts) automatically.
 
 ## Connections and restarts
 
