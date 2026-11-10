@@ -3,6 +3,6 @@
   "minVersion": "0.8",
   "package": "me.arycer.stagecraft.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": ["DrawContextMixin", "GameRendererMixin", "ScreenMixin"],
+  "client": ["DrawContextMixin", "GameRendererMixin", "MinecraftClientTitleMixin", "ScreenMixin"],
   "injectors": { "defaultRequire": 1 }
 }

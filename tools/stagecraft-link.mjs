@@ -9,11 +9,11 @@
 //   await link.close();
 //
 // CLI:
-//   node tools/stagecraft-link.mjs <client dir> status
-//   node tools/stagecraft-link.mjs <client dir> run <name> [key=value ...]   (exit code 0 only if it passed)
-//   node tools/stagecraft-link.mjs <client dir> run-file <file.lua> [key=value ...]
-//   node tools/stagecraft-link.mjs <client dir> player
-//   node tools/stagecraft-link.mjs <client dir> command "<command>"
+//   node tools/stagecraft-link.mjs <client name | dir> status
+//   node tools/stagecraft-link.mjs <client name | dir> run <name> [key=value ...]   (exit code 0 only if it passed)
+//   node tools/stagecraft-link.mjs <client name | dir> run-file <file.lua> [key=value ...]
+//   node tools/stagecraft-link.mjs <client name | dir> player
+//   node tools/stagecraft-link.mjs <client name | dir> command "<command>"
 //
 // The client must run with STAGECRAFT_LINK=on (or config/stagecraft/link.properties enabled=true).
 import fs from 'node:fs';
@@ -181,12 +181,14 @@ function parseArgs(pairs) {
 }
 
 async function main() {
-    const [clientDir, command, ...rest] = process.argv.slice(2);
-    if (!clientDir || !command) {
-        console.error('usage: stagecraft-link.mjs <client dir> status | run <name> [k=v...] | run-file <file.lua> [k=v...] | player | command "<cmd>"');
+    const [target, command, ...rest] = process.argv.slice(2);
+    if (!target || !command) {
+        console.error('usage: stagecraft-link.mjs <client name | client dir> status | run <name> [k=v...] | run-file <file.lua> [k=v...] | player | command "<cmd>"');
         process.exit(2);
     }
-    const link = await connect(clientDir);
+    // A bare name is a tools/hmc client (run/hmc/client-<name>); anything else is a game directory.
+    const { clientDir } = await import('./hmc/hmc.mjs');
+    const link = await connect(fs.existsSync(target) ? target : clientDir(target));
     try {
         if (command === 'status' || command === 'player') {
             console.log(JSON.stringify(await link[command](), null, 2));

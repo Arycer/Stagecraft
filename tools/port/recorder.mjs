@@ -1,4 +1,4 @@
-// Stand-in for mc-headless/hmc.mjs while porting: records what the scenario asks each client to do.
+// Stand-in for hmc.mjs (old mc-headless scenarios) while porting: records what the scenario asks each client to do.
 const state = globalThis.__stagecraftPort;
 
 export function startClient(name) {

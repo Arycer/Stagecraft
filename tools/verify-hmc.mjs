@@ -1,15 +1,15 @@
 // Checks an already-connected HMC client through the Stagecraft link (the client runs with STAGECRAFT_LINK=on).
-// HMC_HOME=... HMC_NAME=HmcInstancedA node tools/verify-hmc.mjs [--fortress [--reuse-fortress]] [--gui]
+// HMC_NAME=HmcInstancedA node tools/verify-hmc.mjs [--fortress [--reuse-fortress]] [--gui]
+// The client is one of tools/hmc (STAGECRAFT_HMC_HOME, default run/hmc), headless or windowed.
 // Uses empty sky coordinates around (8192,200,8192). Results come from the link (status, steps, logs), not
 // from console.log. Writes build/hmc-verification.json.
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { connect } from './stagecraft-link.mjs';
+import { clientDir } from './hmc/hmc.mjs';
 
-const home = process.env.HMC_HOME;
-if (!home) throw Error('Set HMC_HOME to mc-headless');
-const dir = path.join(home, 'client-' + (process.env.HMC_NAME ?? 'HmcInstancedA'));
+const dir = clientDir(process.env.HMC_NAME ?? 'HmcInstancedA');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const results = [];
 const reuse = process.argv.includes('--reuse-fortress')

@@ -10,6 +10,10 @@ import me.arycer.stagecraft.script.Failures;
 import me.arycer.stagecraft.script.RunListener;
 import me.arycer.stagecraft.script.ScenarioRunner;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.TitleScreen;
+import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
+import net.minecraft.client.network.ServerAddress;
+import net.minecraft.client.network.ServerInfo;
 import org.java_websocket.WebSocket;
 
 import java.util.LinkedHashMap;
@@ -31,7 +35,8 @@ import java.util.function.Supplier;
  *       {@code args} (object of strings) and {@code origin} ({@code dimension, x, y, z, yaw, pitch}; missing
  *       fields come from the player); replies {@code run_id};</li>
  *   <li>{@code cancel}; {@code player} (name, dimension, position; {@code connected});
- *       {@code command} (sends {@code command} as the player); {@code signal} ({@code name}, relayed from another client).</li>
+ *       {@code command} (sends {@code command} as the player); {@code signal} ({@code name}, relayed from another client);
+ *       {@code connect} ({@code host}, {@code port}), {@code disconnect} and {@code quit} (client lifecycle without a console).</li>
  * </ul>
  * Every connection also gets events {@code {"type": "event", "event": …}}: {@code started}, {@code log},
  * {@code step}, {@code signal}, {@code finished} (with the JSON report) and {@code chat} (text and translation keys).
@@ -79,6 +84,15 @@ public final class LinkProtocol implements RunListener {
                     runner.signal(message.get("name").getAsString());
                     yield new JsonObject();
                 }
+                case "connect" -> connect(message);
+                case "disconnect" -> onClient(() -> {
+                    if (client.world != null) client.disconnect();
+                    return new JsonObject();
+                });
+                case "quit" -> {
+                    client.execute(client::scheduleStop);
+                    yield new JsonObject();
+                }
                 default -> throw new IllegalArgumentException("Unknown request type: " + type);
             };
             reply.add("id", id);
@@ -98,6 +112,20 @@ public final class LinkProtocol implements RunListener {
     }
 
     // --- Requests ----------------------------------------------------------------------------------------
+
+    /** Joins {@code host:port} as from the multiplayer screen; the reply comes before the login finishes (poll {@code player}). */
+    private JsonObject connect(JsonObject message) throws Exception {
+        String host = message.get("host").getAsString();
+        int port = message.has("port") ? message.get("port").getAsInt() : 25565;
+        String address = host + ":" + port;
+        if (!ServerAddress.isValid(address)) throw new IllegalArgumentException("Invalid server address: " + address);
+        return onClient(() -> {
+            if (client.world != null) throw new IllegalStateException("Already in a world; disconnect first");
+            ConnectScreen.connect(new TitleScreen(), client, ServerAddress.parse(address),
+                    new ServerInfo("Stagecraft", address, ServerInfo.ServerType.OTHER), false, null);
+            return new JsonObject();
+        });
+    }
 
     private JsonObject status() {
         JsonObject reply = new JsonObject();

@@ -192,8 +192,8 @@ if (current.length && body.length === 0) {
 const header = [
     `-- Ported from ${path.basename(source)} by tools/port-scenario.mjs: review the TODOs before relying on it.`,
     roles.length > 1
-        ? `-- Roles: ${state.clients.map((name, i) => `${roles[i]}=${name}`).join(', ')}. Run: node tools/director.mjs --hmc <mc-headless> ${state.clients.map((name, i) => `--role ${roles[i]}=${name}`).join(' ')} run <this file>`
-        : `-- Run: node tools/director.mjs --hmc <mc-headless> --role A=${state.clients[0] ?? 'HmcInstancedA'} run <this file>`,
+        ? `-- Roles: ${state.clients.map((name, i) => `${roles[i]}=${name}`).join(', ')}. Run: node tools/director.mjs --start ${state.clients.map((name, i) => `--role ${roles[i]}=${name}`).join(' ')} run <this file>`
+        : `-- Run: node tools/director.mjs --start --role A=${state.clients[0] ?? 'HmcInstancedA'} run <this file>`,
     `-- Server files go through stage.host: the server needs Stagecraft with config/stagecraft-server.properties enabled=true.`,
     ...state.errors.map(error => `-- TODO: the recording stopped early: ${error}`),
     '',

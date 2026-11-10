@@ -6,6 +6,7 @@ import me.arycer.stagecraft.examples.ExampleInstaller;
 import me.arycer.stagecraft.host.client.ClientHostChannel;
 import me.arycer.stagecraft.link.Link;
 import me.arycer.stagecraft.script.ScenarioRunner;
+import me.arycer.stagecraft.window.WindowPlacement;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -38,6 +39,7 @@ public final class StagecraftClient implements ClientModInitializer {
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> received(runner, link, message));
         ClientReceiveMessageEvents.CHAT.register((message, signed, sender, params, timestamp) -> received(runner, link, message));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, disconnected) -> runner.cancel());
+        ClientLifecycleEvents.CLIENT_STARTED.register(WindowPlacement::apply);
         ClientLifecycleEvents.CLIENT_STOPPING.register(stopping -> {
             runner.cancel();
             link.ifPresent(Link::stop);
