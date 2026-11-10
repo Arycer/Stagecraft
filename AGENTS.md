@@ -9,5 +9,5 @@ Minecraft 1.21.1, Yarn 1.21.1+build.3, Java 21, Fabric Loader 0.18.4, Fabric API
 - Instanced is optional. Its adapter uses existing admin requests and preserves server-side permission/path validation.
 - Build and tests: `gradlew.bat build collectHeadlessMods`.
 - HMC verification: `HMC_HOME=... node tools/verify-hmc.mjs --fortress` (requires a connected creative admin client and local test server; see README).
-- Examples are bundled and copied only if absent. `tools/port-fortress.mjs` is an offline migration helper; the emitted Lua has no Node dependency.
+- Examples are bundled; `ExampleInstaller` installs missing ones, updates copies the player never edited (SHA-256 in `.examples.properties`) and writes `<name>.lua.new` next to edited ones. `tools/port-fortress.mjs` is an offline migration helper; the emitted Lua has no Node dependency.
 - Do not execute example constructors on occupied areas; tests must preflight their own area and clean temporary processes.

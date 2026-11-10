@@ -22,4 +22,8 @@ class OriginTest {
         assertEquals("execute in minecraft:overworld positioned 0.999999999 80.0 0.0 rotated 0.0 0.0 run setblock ~ ~ ~ minecraft:stone",
                 new Origin("minecraft:overworld", 0.999999999, 80, 0, 0, 0).wrap("setblock ~ ~ ~ minecraft:stone"));
     }
+    @Test void neverUsesScientificNotation() {
+        assertEquals("execute in minecraft:overworld positioned 0.0001 80.0 12000000.5 rotated 0.00001 -0.0002 run say hi",
+                new Origin("minecraft:overworld", 0.0001, 80, 12_000_000.5, 1.0E-5f, -2.0E-4f).wrap("say hi"));
+    }
 }

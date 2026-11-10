@@ -6,7 +6,7 @@ Mod de cliente Fabric para ejecutar escenarios Lua desde una ventana de Minecraf
 
 1. Compilar con `gradlew.bat build collectHeadlessMods`.
 2. Instalar `build/libs/stagecraft-0.1.0.jar` y Fabric API en el cliente. El servidor no necesita Stagecraft.
-3. Conectar al servidor y escribir `/stagecraft list`. En el primer arranque se copian `platform.lua`, `smoke.lua` y `fortress.lua` a `config/stagecraft/scripts/` dentro de la carpeta del juego. Los archivos existentes se conservan.
+3. Conectar al servidor y escribir `/stagecraft list`. Al arrancar se instalan `platform.lua`, `smoke.lua` y `fortress.lua` en `config/stagecraft/scripts/` dentro de la carpeta del juego. Un ejemplo que no has editado se actualiza solo cuando cambia la versión incluida en el mod; uno editado se conserva y la versión nueva queda al lado como `<nombre>.lua.new`. Los hashes de lo instalado están en `.examples.properties`.
 4. Ejecutar `/stagecraft run platform`, o un script propio guardado en esa carpeta.
 
 Los comandos se envían como el jugador conectado, con sus permisos normales. Para las construcciones y capturas de ejemplo hacen falta permisos de administrador; fortress requiere además creativo. Cada jugador real necesita su propio cliente; un script no simula otras cuentas.
@@ -24,7 +24,7 @@ Los comandos se envían como el jugador conectado, con sus permisos normales. Pa
 
 Para fortress, sitúate sobre el suelo y mira hacia la zona de construcción. El script ignora el pitch y ajusta el yaw al cardinal más cercano: todo queda **delante y a tu derecha**, a partir de dos bloques de separación. La base se apoya encima del suelo a la altura de tus pies; no comprueba ni reemplaza el bloque de soporte. Requiere una zona despejada de **56 bloques a la derecha, 96 hacia delante y 13 de alto** (desplazamientos derecha 2..57, delante 2..97, altura 0..12). Las coordenadas, caras de bloques, carteles, zonas y cajas de captura se transforman juntas. El jugador se mueve durante las capturas y activa el vuelo permitido por el servidor; el origen permanece fijo.
 
-`/stagecraft run <Tab>` sugiere los scripts `.lua` válidos de la carpeta, sin extensión. La lista se actualiza cuando añades o eliminas archivos, sin reiniciar. Al actualizar un ejemplo existente, copia `examples/fortress.lua` sobre tu `config/stagecraft/scripts/fortress.lua`: la instalación automática conserva las copias ya existentes.
+`/stagecraft run <Tab>` sugiere los scripts `.lua` válidos de la carpeta, sin extensión. La lista se actualiza cuando añades o eliminas archivos, sin reiniciar. Si editaste un ejemplo y quieres la versión nueva, copia `<nombre>.lua.new` sobre `<nombre>.lua`; a partir de ahí vuelve a actualizarse solo.
 
 ## API Lua v1
 
@@ -65,7 +65,7 @@ Los nombres de archivo admiten letras ASCII, números, `_` y `-`. Las respuestas
 
 `fortress.lua` construye la fortaleza, trece assets, sus bloques de captura y el portal. Captura los archivos mediante `/instanced capture`, guarda seis pools y el nivel mediante la administración existente y pregenera tres slots. Cada ejecución usa `stagecraft:<run_id>/fortress` y rutas nuevas: no sobrescribe los IDs `demo:*`. El punto de salida del portal se calcula respecto al origen y a su dimensión.
 
-Hace falta Instanced **0.1.0** tanto en cliente como en servidor y sus dependencias. El adaptador está aislado y enlaza opcionalmente con `AdminClient.send`; no usa archivos del servidor ni añade permisos. Las versiones futuras de ese protocolo pueden requerir actualizar el adaptador. Los ejemplos `platform` y `smoke` no necesitan Instanced.
+Hace falta Instanced **0.1.0** tanto en cliente como en servidor y sus dependencias. El adaptador está aislado y enlaza opcionalmente con `AdminClient.send`; no usa archivos del servidor ni añade permisos. Las versiones futuras de ese protocolo pueden requerir actualizar el adaptador: si `AdminClient` o su respuesta cambian, el guardado falla con un mensaje de versión incompatible. El límite de una definición es de 64 000 bytes en UTF-8. Los ejemplos `platform` y `smoke` no necesitan Instanced.
 
 ## HeadlessMC
 

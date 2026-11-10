@@ -19,7 +19,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 import java.nio.file.Files;
-import java.io.InputStream;
+import java.util.List;
 
 public final class StagecraftClient implements ClientModInitializer {
     private ScenarioRunner runner;
@@ -28,14 +28,10 @@ public final class StagecraftClient implements ClientModInitializer {
         MinecraftClient client = MinecraftClient.getInstance();
         try {
             runner = new ScenarioRunner(client, client.runDirectory.toPath().resolve("config/stagecraft/scripts"));
-            for (String name : new String[]{"platform", "fortress", "smoke"}) {
-                var target = runner.scripts().resolve(name + ".lua");
-                if (!Files.exists(target)) {
-                    try (InputStream source = getClass().getResourceAsStream("/stagecraft/examples/" + name + ".lua")) {
-                        if (source != null) Files.copy(source, target);
-                    }
-                }
-            }
+            var outcome = ExampleInstaller.install(runner.scripts(), List.of("platform", "fortress", "smoke"),
+                    name -> getClass().getResourceAsStream("/stagecraft/examples/" + name + ".lua"));
+            if (!outcome.updated().isEmpty()) System.out.println("[Stagecraft] Updated examples: " + String.join(", ", outcome.updated()));
+            if (!outcome.kept().isEmpty()) System.out.println("[Stagecraft] Edited examples kept; new versions in <name>.lua.new: " + String.join(", ", outcome.kept()));
         }
         catch (Exception error) { throw new IllegalStateException("Cannot create Stagecraft script directory", error); }
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> runner.message(message.getString()));
@@ -45,7 +41,7 @@ public final class StagecraftClient implements ClientModInitializer {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, access) -> {
             var scenario = ClientCommandManager.argument("name", StringArgumentType.word())
                     .suggests((context, builder) -> CommandSource.suggestMatching(runner.scenarios(), builder))
-                    .executes(context -> run(StringArgumentType.getString(context, "name"), currentOrigin(client)))
+                    .executes(context -> run(context, StringArgumentType.getString(context, "name"), currentOrigin(client)))
                     .then(ClientCommandManager.literal("at").then(position(false)))
                     .then(ClientCommandManager.literal("in").then(ClientCommandManager.argument("dimension", IdentifierArgumentType.identifier())
                             .then(ClientCommandManager.literal("at").then(position(true)))));
@@ -87,16 +83,16 @@ public final class StagecraftClient implements ClientModInitializer {
             context.getSource().sendError(Text.literal("Invalid dimension: " + world));
             return 0;
         }
-        return run(StringArgumentType.getString(context, "name"), new Origin(world,
+        return run(context, StringArgumentType.getString(context, "name"), new Origin(world,
                 DoubleArgumentType.getDouble(context, "x"), DoubleArgumentType.getDouble(context, "y"), DoubleArgumentType.getDouble(context, "z"),
                 facing ? FloatArgumentType.getFloat(context, "yaw") : current.yaw(),
                 facing ? FloatArgumentType.getFloat(context, "pitch") : current.pitch()));
     }
 
-    private int run(String name, Origin origin) {
+    private int run(CommandContext<FabricClientCommandSource> context, String name, Origin origin) {
         try { runner.start(name, origin); return 1; }
         catch (Exception error) {
-            MinecraftClient.getInstance().player.sendMessage(Text.literal("[Stagecraft] " + error.getMessage()), false);
+            context.getSource().sendError(Text.literal("[Stagecraft] " + ScenarioRunner.describe(error, 0)));
             return 0;
         }
     }

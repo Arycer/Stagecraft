@@ -28,7 +28,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
@@ -98,7 +102,7 @@ public final class ScenarioRunner {
                 check(started);
                 status = "passed " + name;
             } catch (Exception | StackOverflowError error) {
-                status = (cancelled ? "cancelled " : "failed ") + name + ": " + error.getMessage();
+                status = (cancelled ? "cancelled " : "failed ") + name + ": " + describe(error, 0);
             } finally {
                 report(status);
             }
@@ -192,7 +196,7 @@ public final class ScenarioRunner {
         for (String kind : List.of("pool", "level")) {
             api.set("instanced_save_" + kind, function(args -> {
                 try { return LuaValue.valueOf(InstancedBridge.save(client, kind, args.checkjstring(1), args.checkjstring(2), () -> cancelled).get(30, TimeUnit.SECONDS)); }
-                catch (Exception error) { throw new LuaError("Instanced " + kind + " save failed: " + error.getMessage()); }
+                catch (Exception error) { throw new LuaError("Instanced " + kind + " save failed: " + describe(error, 30)); }
             }));
         }
         api.set("expect_chat", function(args -> {
@@ -235,7 +239,7 @@ public final class ScenarioRunner {
             } catch (Exception error) { result.completeExceptionally(error); }
         });
         try { result.get(10, TimeUnit.SECONDS); }
-        catch (Exception error) { throw new LuaError(error.getMessage()); }
+        catch (Exception error) { throw new LuaError(describe(error, 10)); }
     }
     private void send(String command, long started) {
         check(started);
@@ -254,8 +258,24 @@ public final class ScenarioRunner {
             } catch (Exception error) { sent.completeExceptionally(error); }
         });
         try { sent.get(10, TimeUnit.SECONDS); }
-        catch (Exception error) { throw new LuaError("Command failed: " + error.getMessage()); }
+        catch (Exception error) { throw new LuaError("Command failed: " + describe(error, 10)); }
         pause(150, started);
+    }
+
+    /**
+     * The message a script author needs: the cause's own text, without the {@code ExecutionException}
+     * wrapper and its class-name prefix, and a readable text for timeouts and cancellation.
+     */
+    static String describe(Throwable error, int timeoutSeconds) {
+        Throwable cause = error;
+        while ((cause instanceof ExecutionException || cause instanceof CompletionException) && cause.getCause() != null) cause = cause.getCause();
+        if (cause instanceof TimeoutException) return "no response after " + timeoutSeconds + " s";
+        if (cause instanceof InterruptedException || cause instanceof CancellationException) {
+            Thread.currentThread().interrupt();
+            return "Cancelled";
+        }
+        String message = cause.getMessage();
+        return message == null || message.isBlank() ? cause.getClass().getSimpleName() : message;
     }
 
     private void check(long started) {
