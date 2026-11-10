@@ -47,6 +47,7 @@ Los originales llevan prefijo `instanced.` y sufijo `.e2e.mjs`, salvo los constr
 | `convert` | A | Conversión, confirmación de reemplazo, menú contextual y cofre conservado |
 | `postprocess` | A | Reparto, grupo añadido, selección de pool y JSON guardado |
 | `admin` | A | Subida local, carpetas, renombrado, pool, nivel, pregen, jugar, ajustes y borrado en uso |
+| `settings-reset` | A | Botón ↺ de cada ajuste global: restablece solo su campo y se guarda el predeterminado (sin `pos`) |
 | `lang` | A, en_us | 7 pestañas, formulario/postproceso, 8 editores, HUD y chat sin claves crudas |
 | `tpa` | A, B | TPA, TPHere y homes bloqueados al cruzar límites de instancia |
 | `rejoin` | A, B | Liberar la instancia de A desconectado, reconectar y volver a entrar |
