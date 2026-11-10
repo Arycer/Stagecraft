@@ -10,6 +10,8 @@ import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaValue;
 import org.luaj.vm2.Varargs;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -39,6 +41,7 @@ public final class ScriptContext {
     private long cursor;
     private volatile int commands;
     private volatile String currentCommand = "";
+    private final List<AutoCloseable> finishers = new ArrayList<>();
 
     ScriptContext(MinecraftClient client, Origin origin, Map<String, String> args, RunReport report, RunLog log,
                   ChatLog chat, BooleanSupplier cancelled) {
@@ -59,6 +62,19 @@ public final class ScriptContext {
     public boolean cancelled() { return cancelled.getAsBoolean(); }
     int commands() { return commands; }
     String currentCommand() { return currentCommand; }
+
+    /** Closed when the run ends, whatever its result (e.g. a capture a module started). */
+    public synchronized void onFinish(AutoCloseable resource) {
+        finishers.add(resource);
+    }
+
+    synchronized void finish() {
+        for (AutoCloseable resource : finishers.reversed()) {
+            try { resource.close(); }
+            catch (Exception error) { System.err.println("[Stagecraft] Cannot close " + resource + ": " + error.getMessage()); }
+        }
+        finishers.clear();
+    }
 
     /** Throws if the run was cancelled, interrupted or ran out of time. */
     public void check() {

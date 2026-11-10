@@ -6,7 +6,7 @@ Mod de cliente Fabric para ejecutar escenarios Lua desde una ventana de Minecraf
 
 1. Compilar con `gradlew.bat build collectHeadlessMods`.
 2. Instalar `build/libs/stagecraft-0.1.0.jar` y Fabric API en el cliente. El servidor no necesita Stagecraft.
-3. Conectar al servidor y escribir `/stagecraft list`. Al arrancar se instalan `platform.lua`, `smoke.lua` y `fortress.lua` en `config/stagecraft/scripts/` dentro de la carpeta del juego. Un ejemplo que no has editado se actualiza solo cuando cambia la versión incluida en el mod; uno editado se conserva y la versión nueva queda al lado como `<nombre>.lua.new`. Los hashes de lo instalado están en `.examples.properties`.
+3. Conectar al servidor y escribir `/stagecraft list`. Al arrancar se instalan `platform.lua`, `smoke.lua`, `fortress.lua` y `gui.lua` en `config/stagecraft/scripts/` dentro de la carpeta del juego. Un ejemplo que no has editado se actualiza solo cuando cambia la versión incluida en el mod; uno editado se conserva y la versión nueva queda al lado como `<nombre>.lua.new`. Los hashes de lo instalado están en `.examples.properties`.
 4. Ejecutar `/stagecraft run platform`, o un script propio guardado en esa carpeta.
 
 Los comandos se envían como el jugador conectado, con sus permisos normales. Para las construcciones y capturas de ejemplo hacen falta permisos de administrador; fortress requiere además creativo. Cada jugador real necesita su propio cliente; un script no simula otras cuentas.
@@ -54,6 +54,25 @@ Para fortress, sitúate sobre el suelo y mira hacia la zona de construcción. El
 | `stage.inventory()` | Lista de `{slot, id, count}` de las ranuras no vacías (índices del inventario vanilla). |
 | `stage.args` | Tabla de `/stagecraft run <nombre> … with clave=valor otra="con espacios"` (siempre strings). |
 | `require(nombre)` | Carga `scripts/lib/<a>/<b>.lua` para `require('a.b')`, una vez por ejecución; nada fuera de `lib/`. |
+
+### Pantallas
+
+Las coordenadas son las de la GUI escalada, las mismas que recibe la pantalla al hacer clic. Las posiciones del texto ya incluyen la transformación de los paneles movidos o escalados (GUI Library), así que no hace falta calcular escalas. Las pantallas sin widgets vanilla, como las de GUI Library, se manejan por su texto. Toda lectura usa un frame dibujado después de la llamada, y cada acción espera dos frames para que la lectura siguiente vea su efecto.
+
+| Función | Uso |
+|---|---|
+| `stage.screen()` | `{open, title, kind, class, width, height, texts, widgets, hud}`. `kind` es el nombre Yarn de las pantallas vanilla (`GameMenuScreen`, `ChatScreen`, `OptionsScreen`…), porque en producción sus clases se llaman `class_433`; para pantallas de mods es su clase. `widgets`: `{index, type, text, x, y, w, h, active, visible, field, value}`. |
+| `stage.texts({hud=false})` | Textos dibujados `{text, x, y, w, h, cx, cy, screen}`, de arriba abajo y de izquierda a derecha. |
+| `stage.wait_text(regex, segundos=10, {hud=false})` | Espera un texto y lo devuelve. |
+| `stage.wait_screen([regex], segundos=10)` | Espera una pantalla abierta (por título, `kind` o clase) y devuelve `stage.screen()`. |
+| `stage.wait_no_screen(segundos=10)` | Espera a que no haya pantalla. |
+| `stage.click_text(regex, {index=1, button=0, dx=0, dy=0, timeout=5, hud=false})` | Hace clic en el centro del texto número `index` que coincida. |
+| `stage.click_widget(regex | índice, {button=0})` | Hace clic en un widget vanilla por su etiqueta o por su índice en `widgets`. |
+| `stage.click(x, y, button=0)`, `stage.scroll(x, y, cantidad)` | Clic y rueda en coordenadas de la GUI. |
+| `stage.type(texto)` | Escribe en el elemento con foco. |
+| `stage.set_field(n, texto)` | Pone el texto del campo número `n` (`field` en `widgets`) y le da el foco. |
+| `stage.key('enter' | 'escape' | 'f8' | 'ctrl+a' …)` | Pulsa y suelta una tecla como el teclado real: funciona con y sin pantalla abierta. |
+| `stage.close()` | Cierra la pantalla abierta como lo haría Escape. |
 
 Ejemplo de construcción relativa:
 

@@ -6,6 +6,7 @@ import me.arycer.stagecraft.report.RunLog;
 import me.arycer.stagecraft.report.RunReport;
 import me.arycer.stagecraft.script.api.ChatModule;
 import me.arycer.stagecraft.script.api.CoreModule;
+import me.arycer.stagecraft.script.api.GuiModule;
 import me.arycer.stagecraft.script.api.InstancedModule;
 import me.arycer.stagecraft.script.api.PlayerModule;
 import me.arycer.stagecraft.script.api.StageModule;
@@ -27,7 +28,7 @@ import java.util.Map;
  */
 public final class ScenarioRunner {
     private static final List<StageModule> MODULES = List.of(
-            new CoreModule(), new ChatModule(), new WorldModule(), new PlayerModule(), new InstancedModule());
+            new CoreModule(), new ChatModule(), new WorldModule(), new PlayerModule(), new GuiModule(), new InstancedModule());
 
     private final MinecraftClient client;
     private final Path scripts;
@@ -118,6 +119,7 @@ public final class ScenarioRunner {
                 result = cancelled ? RunReport.Status.CANCELLED : RunReport.Status.FAILED;
                 status = (cancelled ? "cancelled " : "failed ") + name + ": " + failure;
             } finally {
+                context.finish();
                 report.finish(result, failure);
                 try { report.write(base); }
                 catch (IOException error) { System.err.println("[Stagecraft] Cannot write report: " + error.getMessage()); }

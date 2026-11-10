@@ -20,7 +20,7 @@ Minecraft 1.21.1, Yarn 1.21.1+build.3, Java 21, Fabric Loader 0.18.4, Fabric API
 | `report` | `RunReport` (JSON, JUnit), `RunLog` (`.log`) | `placement` |
 | `examples` | `ExampleInstaller` | — |
 | `integration.instanced` | `InstancedBridge` (reflection; optional) | — |
-| `gui` / `mixin` | screen capture and its mixins | `mixin` → `gui` |
+| `gui` / `mixin` | `ScreenCapture` (text drawn per frame with its transformed box, only while a run holds a handle), `ScreenElements`, `ScreenKinds` (readable vanilla screen names; classes are intermediary in production), `Keys`; mixins on `DrawContext.drawText`, `GameRenderer.render`, `Screen.renderWithTooltip` | `mixin` → `gui` |
 
 `ArchitectureTest` enforces the table; a new package needs a row there. A new `stage.*` function goes in the
 module of its area (or a new `StageModule` listed in `ScenarioRunner.MODULES`), never in the runner.

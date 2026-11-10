@@ -15,7 +15,7 @@ import java.util.List;
 
 /** Entrypoint: creates the runner, installs the examples and wires the client events and the command. */
 public final class StagecraftClient implements ClientModInitializer {
-    private static final List<String> EXAMPLES = List.of("platform", "fortress", "smoke");
+    private static final List<String> EXAMPLES = List.of("platform", "fortress", "smoke", "gui");
 
     @Override public void onInitializeClient() {
         MinecraftClient client = MinecraftClient.getInstance();
