@@ -43,6 +43,7 @@ public final class ScenarioRunner {
     private volatile ScriptContext current;
     private volatile String status = "idle";
     private volatile boolean cancelled;
+    private volatile String cancellationReason;
     private volatile RunReport lastReport;
     private final Signals signals = new Signals();
     private final Connection connection = new Connection();
@@ -78,6 +79,11 @@ public final class ScenarioRunner {
         cancelled = true;
         Thread running = worker;
         if (running != null) running.interrupt();
+    }
+
+    public void cancel(String reason) {
+        cancellationReason = reason;
+        cancel();
     }
 
     /** A received chat or game message, with the translation keys it carries. */
@@ -128,12 +134,15 @@ public final class ScenarioRunner {
 
     /** The client left its server: cancels the run unless the disconnect was expected (see {@link Connection}). */
     public void disconnected() {
+        connection.disconnected();
         if (!connection.expectingDisconnect()) cancel();
     }
 
     public Connection connection() {
         return connection;
     }
+
+    public HostChannel host() { return host; }
 
     public void addListener(RunListener listener) {
         listeners.add(listener);
@@ -151,9 +160,10 @@ public final class ScenarioRunner {
         RunReport report = new RunReport(name, origin, args);
         String runId = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         cancelled = false;
+        cancellationReason = null;
         ScriptContext context = new ScriptContext(client, origin, args, report,
                 new RunLog(base.resolveSibling(base.getFileName() + ".log")), chat, () -> cancelled, events, runId, host, signals, connection);
-        connection.expectDisconnect(false);
+        connection.beginRun();
         signals.clear();
         current = context;
         status = "running " + name;
@@ -168,6 +178,7 @@ public final class ScenarioRunner {
                 status = "passed " + name;
             } catch (Exception | StackOverflowError error) {
                 failure = Failures.describe(error, 0);
+                if (cancelled && cancellationReason != null) failure = cancellationReason;
                 result = cancelled ? RunReport.Status.CANCELLED : RunReport.Status.FAILED;
                 status = (cancelled ? "cancelled " : "failed ") + name + ": " + failure;
             } finally {
@@ -194,6 +205,9 @@ public final class ScenarioRunner {
         @Override public void finished(RunReport report) { each(l -> l.finished(report)); }
         @Override public void signal(String name) { each(l -> l.signal(name)); }
         @Override public void director(String id, String action) { each(l -> l.director(id, action)); }
+        @Override public void director(String id, String action, Map<String, String> parameters) {
+            each(l -> l.director(id, action, parameters));
+        }
 
         private void each(Consumer<RunListener> call) {
             for (RunListener listener : listeners) {

@@ -26,13 +26,12 @@ import { launchWindowed } from './launch.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const HOME = path.resolve(process.env.STAGECRAFT_HMC_HOME ?? path.join(REPO, 'run', 'hmc'));
-const LAUNCHER = path.join(HOME, 'headlessmc-launcher.jar');
 const VERSION = process.env.HMC_VERSION ?? 'fabric-loader-0.18.4-1.21.1';
 const CONTROL_BASE_PORT = 47100;
 const HMC_SPECIFICS = /^hmc-specifics.*\.jar$/;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-export const clientDir = name => path.join(HOME, `client-${name}`);
+export const clientDir = (name, home = HOME) => path.join(home, `client-${name}`);
 const portFile = name => path.join(clientDir(name), 'control.port');
 
 /** options.txt for a fresh run. lang defaults to HMC_LANG or es_es (the Instanced scenarios match Spanish). */
@@ -73,10 +72,11 @@ function copyMods(dir, sources, windowed) {
  *   env       extra environment for the game (e.g. { STAGECRAFT_LINK: 'on' }; windowed clients always get it)
  *   lang      game language (default HMC_LANG or es_es)
  */
-export function startClient(name, { windowed = false, window, label, mods = [], env = {}, lang } = {}) {
-    if (!windowed && !fs.existsSync(LAUNCHER)) throw new Error(`HeadlessMC is not set up in ${HOME}: run node tools/hmc/setup.mjs`);
-    const dir = clientDir(name);
-    const sources = [path.join(HOME, 'mods'), ...(process.env.HMC_MODS ?? '').split(path.delimiter).filter(Boolean), ...mods];
+export function startClient(name, { windowed = false, window, label, mods = [], baseMods, home = HOME, env = {}, lang } = {}) {
+    const launcher = path.join(home, 'headlessmc-launcher.jar');
+    if (!windowed && !fs.existsSync(launcher)) throw new Error(`HeadlessMC is not set up in ${home}: run node tools/hmc/setup.mjs`);
+    const dir = clientDir(name, home);
+    const sources = [path.join(home, 'mods'), ...(baseMods ?? (process.env.HMC_MODS ?? '').split(path.delimiter).filter(Boolean)), ...mods];
     copyMods(dir, sources, windowed);
     if (sources.length === 1) console.warn('HMC_MODS is not set: only the jars in <home>/mods will be loaded');
     fs.writeFileSync(path.join(dir, 'options.txt'), options({ lang, windowed }));
@@ -116,12 +116,12 @@ export function startClient(name, { windowed = false, window, label, mods = [], 
     let java = null;
     let link = null;
     const launched = windowed
-        ? launchWindowed({ home: HOME, version: VERSION, name, dir, env: gameEnv, log: text => { lines.push(text); console.log(text); } })
+        ? launchWindowed({ home, version: VERSION, name, dir, env: gameEnv, log: text => { lines.push(text); console.log(text); } })
             .then(process => { java = attach(process); client.process = java; return java; })
         : Promise.resolve(java = attach(spawn('java', [
             '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8', '-Dfile.encoding=UTF-8',
             '-Dhmc.jvmargs=-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dfile.encoding=UTF-8',
-            `-Dhmc.mcdir=${path.join(HOME, '.minecraft')}`,
+            `-Dhmc.mcdir=${path.join(home, '.minecraft')}`,
             `-Dhmc.gamedir=${dir}`,
             '-Dhmc.offline=true',
             `-Dhmc.offline.username=${name}`,
@@ -130,17 +130,17 @@ export function startClient(name, { windowed = false, window, label, mods = [], 
             '-Dhmc.auto.download.versions=true',
             '-Dhmc.assets.dummy=true',
             '-Dhmc.check.xvfb=false',
-            '-jar', LAUNCHER, '--command', `launch ${VERSION} -lwjgl --offline`,
+            '-jar', launcher, '--command', `launch ${VERSION} -lwjgl --offline`,
         // Each launcher owns its temporary patched jars/natives. A shared cwd lets another launcher's
         // cleanup remove these while an existing client is loading them (MemoryUtil NoClassDefFoundError).
         ], { cwd: dir, stdio: ['pipe', 'pipe', 'pipe'], env: gameEnv })));
     launched.catch(error => lines.push(`[hmc] launch failed: ${error.message}`));
 
     /** The client's Stagecraft link (windowed clients are driven through it). */
-    const linkOf = async () => {
+    const linkOf = async (timeout = 600_000) => {
         if (!link) {
             const { connect } = await import('../stagecraft-link.mjs');
-            link = await connect(dir, { timeout: 600_000 });
+            link = await connect(dir, { timeout });
             link.on('close', () => { link = null; });
         }
         return link;
@@ -200,27 +200,29 @@ export function startClient(name, { windowed = false, window, label, mods = [], 
             await sleep(1500);
         },
         /** Quits the game; resolves once the process has exited (killed after 11 s). */
-        async stop() {
-            await launched.catch(() => {});
-            if (!java || java.exitCode !== null) return;
-            const exited = new Promise(resolve => java.once('exit', resolve));
-            // A player who disconnects inside a portal walks into it on the next login (another scenario's
-            // start): step off to a spot no scenario uses for portals before quitting (ignored if offline).
-            if (windowed) {
+        async stop({ park = true } = {}) {
+            if (client.stopping) return client.stopping;
+            client.stopping = (async () => {
+                await launched.catch(() => {});
+                if (!java || java.exitCode !== null) return;
+                const exited = new Promise(resolve => java.once('close', resolve));
                 try {
-                    const l = await linkOf();
-                    await l.command('execute in minecraft:overworld run tp @s 0.5 100 -3.5').catch(() => {});
-                    await sleep(1000);
-                    await l.request('quit').catch(() => {});
-                    await l.close().catch(() => {});
-                } catch { /* no link: killed below */ }
-            } else {
-                try { java.stdin.write('/execute in minecraft:overworld run tp @s 0.5 100 -3.5\n'); } catch { }
-                setTimeout(() => { try { java.stdin.write('quit\n'); } catch { } }, 1000);
-            }
-            const timer = setTimeout(() => { if (java.exitCode === null) java.kill(); }, 11_000);
-            await exited;
-            clearTimeout(timer);
+                    const control = await linkOf(1500);
+                    if (park) {
+                        await control.command('execute in minecraft:overworld run tp @s 0.5 100 -3.5').catch(() => {});
+                    }
+                    await control.request('quit').catch(() => {});
+                    await control.close().catch(() => {});
+                } catch {
+                    if (!windowed) {
+                        try { java.stdin.write('quit\n'); } catch { }
+                    }
+                }
+                const timer = setTimeout(() => { if (java.exitCode === null) java.kill(); }, 11_000);
+                await exited;
+                clearTimeout(timer);
+            })();
+            return client.stopping;
         },
     };
     return client;

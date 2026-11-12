@@ -1,6 +1,7 @@
 package me.arycer.stagecraft.script;
 
 import me.arycer.stagecraft.report.RunReport;
+import java.util.Map;
 
 /**
  * Follows runs as they happen (the link streams these to its clients). Called from the script's worker
@@ -20,4 +21,8 @@ public interface RunListener {
 
     /** The script asks the director for something only it can do (e.g. {@code restart_server}); it answers by id. */
     default void director(String id, String action) {}
+
+    default void director(String id, String action, Map<String, String> parameters) {
+        director(id, action);
+    }
 }

@@ -38,11 +38,29 @@ export async function linkInfo(clientDir, timeout = 120_000) {
 
 /** Connects to a client: `target` is its directory or `{ port, token }`. */
 export async function connect(target, { timeout = 120_000 } = {}) {
-    const info = typeof target === 'string' ? await linkInfo(target, timeout) : target;
-    const socket = new WebSocket(`ws://127.0.0.1:${info.port}/?token=${encodeURIComponent(info.token)}`);
-    const link = new Link(socket);
-    await link.ready;
-    return link;
+    const deadline = Date.now() + timeout;
+    let lastError;
+    while (Date.now() < deadline) {
+        const info = typeof target === 'string' ? await linkInfo(target, deadline - Date.now()) : target;
+        const socket = new WebSocket('ws://127.0.0.1:' + info.port + '/?token=' + encodeURIComponent(info.token));
+        const link = new Link(socket);
+        let timer;
+        try {
+            await Promise.race([link.ready, new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new Error('Stagecraft handshake timed out')),
+                    Math.min(5_000, deadline - Date.now()));
+            })]);
+            return link;
+        } catch (error) {
+            lastError = error;
+            socket.close();
+            if (typeof target !== 'string') throw error;
+            await sleep(100);
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+    throw lastError ?? new Error('Stagecraft link timed out');
 }
 
 export class Link {
@@ -51,21 +69,28 @@ export class Link {
     #pending = new Map();
     #listeners = new Map();
     #finished = new Map();
+    #runs = new Map();
 
     constructor(socket) {
         this.#socket = socket;
         this.ready = new Promise((resolve, reject) => {
             socket.addEventListener('message', event => {
                 const message = JSON.parse(event.data);
-                if (message.type === 'hello') { this.hello = message; resolve(this); return; }
-                this.#receive(message);
+                if (message.type === 'hello') {
+                    this.hello = message;
+                    resolve(this);
+                } else {
+                    this.#receive(message);
+                }
             });
             socket.addEventListener('error', () => reject(new Error('Stagecraft link connection failed')));
             socket.addEventListener('close', event => {
-                const error = new Error(`Stagecraft link closed (${event.code}${event.reason ? ': ' + event.reason : ''})`);
+                const error = new Error('Stagecraft link closed (' + event.code + (event.reason ? ': ' + event.reason : '') + ')');
                 reject(error);
-                for (const { reject: fail } of this.#pending.values()) fail(error);
+                for (const pending of this.#pending.values()) pending.reject(error);
+                for (const run of this.#runs.values()) run.reject(error);
                 this.#pending.clear();
+                this.#runs.clear();
                 this.#emit('close', { code: event.code, reason: event.reason });
             });
         });
@@ -80,15 +105,17 @@ export class Link {
             else pending.resolve(message);
             return;
         }
-        if (message.type === 'event') {
-            if (message.event === 'finished') {
-                const waiter = this.#finished.get(message.run_id);
-                if (waiter) { this.#finished.delete(message.run_id); waiter(message); }
-                else this.#finished.set(message.run_id, message); // finished before run() registered
+        if (message.type !== 'event') return;
+        if (message.event === 'finished') {
+            const run = this.#runs.get(message.run_id);
+            if (run) run.resolve(message);
+            else {
+                this.#finished.set(message.run_id, message);
+                if (this.#finished.size > 128) this.#finished.delete(this.#finished.keys().next().value);
             }
-            this.#emit(message.event, message);
-            this.#emit('event', message);
         }
+        this.#emit(message.event, message);
+        this.#emit('event', message);
     }
 
     #emit(name, payload) {
@@ -97,56 +124,70 @@ export class Link {
         }
     }
 
-    /** Listens to `started`, `log`, `step`, `finished`, `chat`, `event` (all) or `close`; returns an unsubscribe function. */
     on(name, listener) {
         if (!this.#listeners.has(name)) this.#listeners.set(name, new Set());
         this.#listeners.get(name).add(listener);
         return () => this.#listeners.get(name).delete(listener);
     }
 
-    /** Sends a request and resolves with its reply (rejects with the error message). */
     request(type, fields = {}, timeout = 15_000) {
+        if (this.#socket.readyState !== 1) return Promise.reject(new Error('Stagecraft link is closed'));
         const id = this.#nextId++;
         return new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
                 this.#pending.delete(id);
-                reject(new Error(`No reply to ${type} in ${timeout} ms`));
+                reject(new Error('No reply to ' + type + ' in ' + timeout + ' ms'));
             }, timeout);
-            this.#pending.set(id, {
+            const pending = {
                 resolve: value => { clearTimeout(timer); resolve(value); },
                 reject: error => { clearTimeout(timer); reject(error); },
-            });
-            this.#socket.send(JSON.stringify({ id, type, ...fields }));
+            };
+            this.#pending.set(id, pending);
+            try { this.#socket.send(JSON.stringify({ id, type, ...fields })); }
+            catch (error) {
+                this.#pending.delete(id);
+                pending.reject(error);
+            }
         });
     }
 
     status() { return this.request('status'); }
     player() { return this.request('player'); }
     command(command) { return this.request('command', { command }); }
-    cancel() { return this.request('cancel'); }
+    cancel(reason) { return this.request('cancel', reason ? { reason } : {}); }
+    host(name, args = {}) { return this.request('host', { function: name, args }); }
 
-    /**
-     * Runs a script (`name`) or inline Lua (`{ source }`) and resolves when it ends with
-     * `{ status, error, report, logs, steps }` (it doesn't throw on a failed scenario; check `status`).
-     */
+    /** Runs one scenario. Socket closure, timeout and cancellation release its event subscriptions. */
     async run(name, { source, args, origin, timeout = 16 * 60_000 } = {}) {
         const logs = [], steps = [];
-        const offLog = this.on('log', e => logs.push(e.text));
-        const offStep = this.on('step', e => steps.push(e));
+        let runId;
+        const belongs = event => runId ? event.run_id === runId
+            : !args?.execution_id || event.execution_id === args.execution_id;
+        const offLog = this.on('log', event => { if (belongs(event)) logs.push(event.text); });
+        const offStep = this.on('step', event => { if (belongs(event)) steps.push(event); });
         try {
             const fields = { name };
             if (source !== undefined) fields.source = source;
-            if (args) fields.args = Object.fromEntries(Object.entries(args).map(([k, v]) => [k, String(v)]));
+            if (args) fields.args = Object.fromEntries(Object.entries(args).map(([key, value]) => [key, String(value)]));
             if (origin) fields.origin = origin;
-            const { run_id: runId } = await this.request('run', fields);
+            ({ run_id: runId } = await this.request('run', fields));
             const finished = await new Promise((resolve, reject) => {
                 const early = this.#finished.get(runId);
-                if (early && typeof early === 'object') { this.#finished.delete(runId); resolve(early); return; }
-                const timer = setTimeout(() => {
+                if (early) {
                     this.#finished.delete(runId);
-                    reject(new Error(`Run ${name} did not finish in ${timeout} ms`));
+                    resolve(early);
+                    return;
+                }
+                const timer = setTimeout(() => {
+                    this.#runs.delete(runId);
+                    const error = new Error('Run ' + name + ' did not finish in ' + timeout + ' ms');
+                    this.cancel(error.message).catch(() => {});
+                    reject(error);
                 }, timeout);
-                this.#finished.set(runId, message => { clearTimeout(timer); resolve(message); });
+                this.#runs.set(runId, {
+                    resolve: value => { clearTimeout(timer); this.#runs.delete(runId); resolve(value); },
+                    reject: error => { clearTimeout(timer); this.#runs.delete(runId); reject(error); },
+                });
             });
             return { runId, status: finished.status, error: finished.error, report: finished.report, logs, steps };
         } finally {
@@ -155,20 +196,24 @@ export class Link {
         }
     }
 
-    /** Resolves with the first chat message after this call that matches a RegExp or has a translation key. */
     waitChat(match, timeout = 15_000) {
         return new Promise((resolve, reject) => {
             const test = typeof match === 'string'
-                ? e => e.keys.some(k => k.key === match)
-                : e => match.test(e.text);
-            const timer = setTimeout(() => { off(); reject(new Error(`No chat matching ${match} in ${timeout} ms`)); }, timeout);
-            const off = this.on('chat', e => { if (test(e)) { clearTimeout(timer); off(); resolve(e); } });
+                ? event => event.keys.some(key => key.key === match)
+                : event => match.test(event.text);
+            const timer = setTimeout(() => { off(); reject(new Error('No chat matching ' + match)); }, timeout);
+            const off = this.on('chat', event => {
+                if (test(event)) { clearTimeout(timer); off(); resolve(event); }
+            });
         });
     }
 
     close() {
-        this.#socket.close();
-        return new Promise(resolve => this.on('close', resolve));
+        if (this.#socket.readyState === 3) return Promise.resolve();
+        return new Promise(resolve => {
+            const off = this.on('close', () => { off(); resolve(); });
+            this.#socket.close();
+        });
     }
 }
 

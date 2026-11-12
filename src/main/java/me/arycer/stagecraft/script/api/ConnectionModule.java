@@ -1,6 +1,5 @@
 package me.arycer.stagecraft.script.api;
 
-import com.google.gson.JsonObject;
 import me.arycer.stagecraft.script.Connection;
 import me.arycer.stagecraft.script.ScriptContext;
 import net.minecraft.client.MinecraftClient;
@@ -12,15 +11,13 @@ import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import static me.arycer.stagecraft.script.api.StageModule.function;
 
-/**
- * {@code connected}, {@code disconnect}, {@code connect} and {@code restart_server}: scenarios that leave and rejoin
- * the server, or restart it, without losing the run. A disconnect the script didn't announce still cancels it.
- */
+/** Connections and named server operations, coordinated without blocking the game thread. */
 public final class ConnectionModule implements StageModule {
     private static final int JOIN_SECONDS = 90;
 
@@ -29,9 +26,10 @@ public final class ConnectionModule implements StageModule {
         Connection connection = context.connection();
         stage.set("connected", function(a -> LuaValue.valueOf(connected(context))));
         stage.set("disconnect", function(a -> {
-            connection.expectDisconnect(true);
+            double seconds = ScriptContext.seconds(a, 1, 120, 900);
+            connection.expectDisconnect("legacy", true, (long) (seconds * 1000));
             context.trace("disconnect");
-            context.onClient(() -> { if (context.client().world != null) context.client().disconnect(); });
+            context.onClient(() -> Connection.disconnect(context.client()));
             if (!context.awaitCondition(() -> !connected(context), 20)) throw new LuaError("Still connected after disconnecting");
             return LuaValue.NIL;
         }));
@@ -42,10 +40,39 @@ public final class ConnectionModule implements StageModule {
             return LuaValue.NIL;
         }));
         stage.set("restart_server", function(a -> {
-            double seconds = ScriptContext.seconds(a, 1, 300, 900);
-            restartServer(context, seconds);
-            return LuaValue.NIL;
+            String server = a.isstring(1) && !a.isnumber(1) ? a.checkjstring(1) : "";
+            double seconds = ScriptContext.seconds(a, server.isEmpty() ? 1 : 2, 300, 900);
+            return directorCall(context, "server.restart", Map.of("server", server), seconds);
         }));
+        for (String operation : new String[]{"start", "stop", "crash"}) {
+            stage.set(operation + "_server", function(a -> directorCall(context, "server." + operation,
+                    Map.of("server", a.checkjstring(1)), ScriptContext.seconds(a, 2, 300, 900))));
+        }
+        stage.set("connect_server", function(a -> directorCall(context, "client.connect",
+                Map.of("server", a.checkjstring(1)), ScriptContext.seconds(a, 2, 90, 900))));
+        stage.set("transfer_server", function(a -> directorCall(context, "client.transfer",
+                Map.of("server", a.checkjstring(1), "command", a.checkjstring(2)),
+                ScriptContext.seconds(a, 3, 90, 900))));
+        stage.set("current_server", function(a -> directorCall(context, "client.where", Map.of(), 10).get("server")));
+    }
+
+    static LuaTable directorCall(ScriptContext context, String action, Map<String, String> parameters, double seconds) {
+        String id = UUID.randomUUID().toString();
+        Map<String, String> request = new HashMap<>(parameters);
+        request.put("timeout", Long.toString((long) (seconds * 1000)));
+        context.director(id, action, request);
+        Connection.Reply[] answer = {null};
+        try {
+            if (!context.awaitCondition(() -> (answer[0] = context.connection().reply(id, "done")) != null, seconds + 5)) {
+                throw new LuaError("Director operation " + action + " timed out");
+            }
+            if (answer[0].phase().equals("error")) throw new LuaError("Director " + action + ": " + answer[0].error());
+            LuaTable result = new LuaTable();
+            answer[0].values().forEach((key, value) -> result.set(key, LuaValue.valueOf(value)));
+            return result;
+        } finally {
+            context.connection().forget(id);
+        }
     }
 
     private static boolean connected(ScriptContext context) {
@@ -57,49 +84,14 @@ public final class ConnectionModule implements StageModule {
         context.trace("connect " + address);
         context.onClient(() -> {
             MinecraftClient client = context.client();
-            if (client.world != null) return;
+            if (client.world != null) {
+                if (client.getCurrentServerEntry() != null && client.getCurrentServerEntry().address.equals(address)) return;
+                throw new IllegalStateException("Already connected to a different server; disconnect first");
+            }
             ConnectScreen.connect(new TitleScreen(), client, ServerAddress.parse(address),
                     new ServerInfo("Stagecraft", address, ServerInfo.ServerType.OTHER), false, null);
         });
         if (!context.awaitCondition(() -> connected(context), JOIN_SECONDS)) throw new LuaError("Could not join " + address + " in " + JOIN_SECONDS + " s");
-        context.pause(1500); // let the world and the server-side join logic settle
         context.connection().expectDisconnect(false);
-    }
-
-    /**
-     * Asks the director to restart the server: it must be ready to start it again (reply {@code ready}); then this
-     * script stops it through the host ({@code stop}), the director starts it, waits for it and reconnects every
-     * client (reply {@code done}).
-     */
-    private static void restartServer(ScriptContext context, double seconds) {
-        Connection connection = context.connection();
-        String id = UUID.randomUUID().toString().substring(0, 8);
-        connection.expectDisconnect(true);
-        context.director(id, "restart_server");
-        Connection.Reply ready = awaitReply(context, id, 30, "ready");
-        if (ready == null || ready.phase().equals("error")) {
-            connection.expectDisconnect(false);
-            throw new LuaError("The director can't restart the server: " + (ready == null ? "no director (run it with tools/director.mjs --server-start …)" : ready.error()));
-        }
-        context.say("restarting the server");
-        JsonObject stop = new JsonObject();
-        stop.addProperty("command", "stop");
-        try {
-            context.host().call("server.command", stop.toString()).get(10, TimeUnit.SECONDS);
-        } catch (Exception ignored) {
-            // The server may close the connection before it answers.
-        }
-        Connection.Reply done = awaitReply(context, id, seconds, "done");
-        if (done == null || done.phase().equals("error")) throw new LuaError("Server restart failed: " + (done == null ? "no reply in " + seconds + " s" : done.error()));
-        if (!context.awaitCondition(() -> connected(context), JOIN_SECONDS)) throw new LuaError("Not reconnected after the server restart");
-        context.pause(1500);
-        connection.expectDisconnect(false);
-        context.say("server restarted");
-    }
-
-    private static Connection.Reply awaitReply(ScriptContext context, String id, double seconds, String phase) {
-        Connection.Reply[] found = {null};
-        context.awaitCondition(() -> (found[0] = context.connection().reply(id, phase)) != null, seconds);
-        return found[0];
     }
 }

@@ -83,6 +83,11 @@ public final class ScriptContext {
         listener.director(id, action);
     }
 
+    public void director(String id, String action, Map<String, String> parameters) {
+        trace("director " + action + " " + id);
+        listener.director(id, action, parameters);
+    }
+
     /** Raises a signal here and announces it (the director relays it to the other clients). */
     public void signal(String name) {
         signals.raise(name);
@@ -108,6 +113,7 @@ public final class ScriptContext {
     /** Throws if the run was cancelled, interrupted or ran out of time. */
     public void check() {
         if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new LuaError("Cancelled");
+        if (connection.reconnectExpired()) throw new LuaError("Expected reconnection deadline expired");
         if (System.nanoTime() - started > TIME_LIMIT_NANOS) throw new LuaError("Scenario exceeded 15 minutes");
     }
 

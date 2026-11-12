@@ -9,8 +9,11 @@ import me.arycer.stagecraft.report.RunReport;
 import me.arycer.stagecraft.script.Failures;
 import me.arycer.stagecraft.script.RunListener;
 import me.arycer.stagecraft.script.ScenarioRunner;
+import me.arycer.stagecraft.script.Connection;
+import com.google.gson.JsonParser;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.TitleScreen;
+import net.minecraft.client.gui.screen.DownloadingTerrainScreen;
 import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
 import net.minecraft.client.network.ServerAddress;
 import net.minecraft.client.network.ServerInfo;
@@ -42,12 +45,13 @@ import java.util.function.Supplier;
  * {@code step}, {@code signal}, {@code finished} (with the JSON report) and {@code chat} (text and translation keys).
  */
 public final class LinkProtocol implements RunListener {
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
 
     private final MinecraftClient client;
     private final ScenarioRunner runner;
     private final Set<WebSocket> connections = new CopyOnWriteArraySet<>();
     private volatile String runId;
+    private volatile String executionId;
 
     public LinkProtocol(MinecraftClient client, ScenarioRunner runner) {
         this.client = client;
@@ -75,27 +79,44 @@ public final class LinkProtocol implements RunListener {
                 case "status" -> status();
                 case "run" -> run(message);
                 case "cancel" -> {
-                    runner.cancel();
+                    if (message.has("reason")) runner.cancel(message.get("reason").getAsString());
+                    else runner.cancel();
                     yield new JsonObject();
                 }
                 case "player" -> onClient(this::player);
                 case "command" -> command(message);
                 case "signal" -> {
-                    runner.signal(message.get("name").getAsString());
-                    yield new JsonObject();
+                    JsonObject result = new JsonObject();
+                    boolean accepted = (!message.has("run_id") || message.get("run_id").getAsString().equals(runId))
+                            && (!message.has("execution_id") || message.get("execution_id").getAsString().equals(executionId));
+                    if (accepted) runner.signal(message.get("name").getAsString());
+                    result.addProperty("accepted", accepted);
+                    yield result;
                 }
                 case "connect" -> connect(message);
                 case "expect_disconnect" -> {
-                    runner.connection().expectDisconnect(message.get("on").getAsBoolean());
+                    String operation = message.has("operation") ? message.get("operation").getAsString() : "legacy";
+                    long timeout = message.has("timeout") ? message.get("timeout").getAsLong() : 120_000;
+                    runner.connection().expectDisconnect(operation, message.get("on").getAsBoolean(), timeout);
                     yield new JsonObject();
                 }
                 case "director_reply" -> {
+                    Map<String, String> values = new LinkedHashMap<>();
+                    if (message.has("values")) message.getAsJsonObject("values").entrySet()
+                            .forEach(entry -> values.put(entry.getKey(), entry.getValue().getAsString()));
                     runner.connection().reply(message.get("request").getAsString(), message.get("phase").getAsString(),
-                            message.has("error") ? message.get("error").getAsString() : null);
+                            message.has("error") ? message.get("error").getAsString() : null, values);
                     yield new JsonObject();
                 }
+                case "host" -> {
+                    String result = runner.host().call(message.get("function").getAsString(),
+                            message.has("args") ? message.get("args").toString() : "{}").get(10, TimeUnit.SECONDS);
+                    JsonObject response = new JsonObject();
+                    response.add("value", JsonParser.parseString(result));
+                    yield response;
+                }
                 case "disconnect" -> onClient(() -> {
-                    if (client.world != null) client.disconnect();
+                    Connection.disconnect(client);
                     return new JsonObject();
                 });
                 case "quit" -> {
@@ -155,9 +176,12 @@ public final class LinkProtocol implements RunListener {
         return onClient(() -> {
             Origin frame = origin(origin);
             String id;
+            String previousExecution = executionId;
+            executionId = args.getOrDefault("execution_id", "");
             try {
                 id = source == null ? runner.start(name, frame, args) : runner.startInline(name, source, frame, args);
             } catch (Exception error) {
+                executionId = previousExecution;
                 throw new IllegalStateException(Failures.describe(error, 0), error);
             }
             JsonObject reply = new JsonObject();
@@ -182,7 +206,15 @@ public final class LinkProtocol implements RunListener {
         JsonObject reply = new JsonObject();
         var player = client.player;
         reply.addProperty("connected", player != null && client.world != null);
+        reply.addProperty("connecting", client.currentScreen instanceof ConnectScreen
+                || client.currentScreen instanceof DownloadingTerrainScreen);
         if (player == null || client.world == null) return reply;
+        if (client.getCurrentServerEntry() != null) {
+            reply.addProperty("server_address", client.getCurrentServerEntry().address);
+        }
+        if (client.getNetworkHandler() != null) {
+            reply.addProperty("remote_address", client.getNetworkHandler().getConnection().getAddress().toString());
+        }
         reply.addProperty("name", player.getGameProfile().getName());
         reply.addProperty("dimension", client.world.getRegistryKey().getValue().toString());
         reply.addProperty("x", player.getX());
@@ -219,6 +251,7 @@ public final class LinkProtocol implements RunListener {
         event.addProperty("type", "event");
         event.addProperty("event", name);
         event.addProperty("run_id", runId);
+        event.addProperty("execution_id", executionId);
         return event;
     }
 
@@ -263,9 +296,24 @@ public final class LinkProtocol implements RunListener {
 
     @Override
     public void director(String id, String action) {
+        director(id, action, Map.of());
+    }
+
+    @Override
+    public void director(String id, String action, Map<String, String> parameters) {
         JsonObject event = event("director");
         event.addProperty("id", id);
         event.addProperty("action", action);
+        parameters.forEach(event::addProperty);
+        broadcast(event);
+    }
+
+    /** Connection events also reach the director while a client is between scenarios. */
+    public void connection(boolean connected, String address, boolean expected) {
+        JsonObject event = event("connection");
+        event.addProperty("connected", connected);
+        event.addProperty("server_address", address);
+        event.addProperty("expected", expected);
         broadcast(event);
     }
 

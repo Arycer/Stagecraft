@@ -4,6 +4,9 @@ import me.arycer.stagecraft.script.ScriptContext;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import static me.arycer.stagecraft.script.api.StageModule.function;
 
@@ -28,6 +31,18 @@ public final class SignalModule implements StageModule {
             if (!context.awaitCondition(() -> context.signals().count(name) >= count, seconds))
                 throw new LuaError("Signal " + name + " reached " + context.signals().count(name) + "/" + count + " in " + seconds + " s");
             return LuaValue.valueOf(context.signals().count(name));
+        }));
+        stage.set("barrier", function(a -> {
+            Map<String, String> parameters = new HashMap<>();
+            parameters.put("name", a.checkjstring(1));
+            if (!a.isnil(3)) {
+                LuaTable roles = a.checktable(3);
+                var names = new ArrayList<String>();
+                for (int i = 1; i <= roles.length(); i++) names.add(roles.get(i).checkjstring());
+                parameters.put("roles", String.join(",", names));
+            }
+            return ConnectionModule.directorCall(context, "barrier", parameters,
+                    ScriptContext.seconds(a, 2, 60, 900));
         }));
     }
 }
