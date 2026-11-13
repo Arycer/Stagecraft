@@ -7,19 +7,20 @@ import { director } from './director.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const groups = [
-    { name: 'single', roles: ['A'], lang: 'es_es', scenarios: ['smoke','config','samples','demo','showcase','fortress','teleports','return','waiting','instances','restart','dimensions','slots','hud','tracker','capture','place','editor','convert','postprocess','admin'] },
+    { name: 'single', roles: ['A'], lang: 'es_es', scenarios: ['smoke','config','samples','demo','showcase','fortress','teleports','return','waiting','instances','restart','dimensions','slots','hud','tracker','capture','place','editor','convert','postprocess','admin','settings-reset','marker-portals'] },
     { name: 'english', roles: ['A'], lang: 'en_us', scenarios: ['lang'] },
     { name: 'duo', roles: ['A','B'], lang: 'es_es', parties: true, scenarios: ['tpa','rejoin','numismatic-parties'] },
     { name: 'party', roles: ['A','B','C','D'], lang: 'es_es', parties: true, scenarios: ['parties'] },
 ];
 
 const argv = process.argv.slice(2);
-let windowed = true, group, only, partyMods;
+let windowed = true, group, only, partyMods, stopServer = false;
 let server = { host: 'localhost', port: 25571 };
 let serverCwd = path.resolve(root, '../Instanced');
 while (argv.length) {
     const flag = argv.shift();
     if (flag === '--headless') windowed = false;
+    else if (flag === '--stop-server') stopServer = true;
     else if (flag === '--group') group = argv.shift();
     else if (flag === '--only') only = argv.shift().split(',');
     else if (flag === '--party-mods') partyMods = path.resolve(argv.shift());
@@ -41,6 +42,7 @@ try {
         console.log(`[suite] ${g.name}: ${g.roles.length} ${windowed ? 'visible' : 'headless'} client(s), ${g.lang}`);
         const roles = Object.fromEntries(g.roles.map(role => [role,{client:'HmcInstanced'+role,window:windowed,mods:g.parties ? [partyMods] : []}]));
         const d = await director({roles,server,start:true,lang:g.lang,serverControl:{start:'gradlew.bat :fabric-server:runServer --console=plain',cwd:serverCwd,log:path.join(output,'server.log')}});
+        let groupPassed = false;
         try {
             for (const name of g.scenarios) {
                 const result = await d.run({file:path.join(root,'scenarios/instanced',name+'.lua')});
@@ -48,7 +50,12 @@ try {
                 report.results.push({scenario:name,group:g.name,passed:result.passed}); save();
                 if (!result.passed) throw new Error(`${name} failed; see ${output}`);
             }
-        } finally { await d.stop(); }
+            groupPassed = true;
+        } finally {
+            try {
+                if (stopServer && (!groupPassed || g === selected.at(-1))) await d.operateServer('stop', 'default', {reconnect:false});
+            } finally { await d.stop(); }
+        }
     }
     report.passed = true;
 } finally {

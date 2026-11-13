@@ -1,6 +1,6 @@
 # Escenarios de Instanced en Stagecraft
 
-26 escenarios migrados de `Documents/mc-test-tools/mc-headless` a Lua, con clientes reales. Verificados con ventanas visibles (26 escenarios, 32 ejecuciones de cliente, 138 pasos aprobados): [handoff-port-scenarios.md](../../docs/handoff-port-scenarios.md). El escenario adicional `marker-portals.lua` pertenece a la implementación de los portales internos.
+28 escenarios de Instanced, incluidos los migrados de `Documents/mc-test-tools/mc-headless` a Lua, con clientes reales. Verificados con ventanas visibles (26 escenarios, 32 ejecuciones de cliente, 138 pasos aprobados): [handoff-port-scenarios.md](../../docs/handoff-port-scenarios.md). La batería completa incluye también `settings-reset.lua` y `marker-portals.lua`, de ajustes y portales internos.
 
 ## Ejecutar la suite
 
@@ -15,6 +15,8 @@ node tools/verify-instanced.mjs --party-mods build/party-client-mods
 La suite abre ventanas visibles por defecto y las coloca en mosaico. Ejecuta los escenarios de un jugador, otro cliente en inglés, los de dos jugadores y los de cuatro. Hace tres reinicios reales del servidor mediante el director; cierra sus clientes al terminar. No inicia el primer servidor: para los reinicios usa `gradlew.bat :fabric-server:runServer` en el proyecto hermano Instanced (`--server-cwd` permite cambiarlo).
 
 `build/party-client-mods` debe contener jars de **la misma compilación que el servidor**: Numismatic Parties, Numismatic Tab API y Cardinal Components base/entity/scoreboard. Se obtienen con `:numismatic-parties:build :numismatic-parties:collectHeadlessMods` en Numismatic. Copiar solo esos cinco jars; el director ya recibe Fabric API y GUI Library por `HMC_MODS`. No incluir otra Fabric API ni Phone. Tras cambiar el protocolo de un mod, reiniciar ambos lados.
+
+La opción `--stop-server` cierra también el servidor al terminar la última tanda o si falla un escenario, antes de cerrar sus clientes.
 
 Opciones: `--headless` para desarrollar sin ventanas; `--group single|english|duo|party` por bloque; `--only capture,place` por nombres. Los subconjuntos necesitan sus fixtures previos: `showcase` antes de `hud` no es necesario, pero sí antes de `tpa`, `restart`, `rejoin`, `tracker` y `postprocess`; `samples` antes de `editor`.
 

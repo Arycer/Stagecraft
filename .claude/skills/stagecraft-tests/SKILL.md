@@ -92,4 +92,4 @@ Everything that depended on reading output is a `TODO`. Finish those by hand (se
 
 ## Full Instanced migration suite
 
-Use `tools/verify-instanced.mjs --party-mods <Parties client jars>` for the complete 26-scenario suite (windows by default, `--headless` for development). It groups roles and languages and retains dated reports. See `scenarios/instanced/README.md` for preparation, required jars, retained construction fixtures and the verification record. Prefer widget labels over ordinal guesses when a custom screen registers fields from hidden tabs.
+Use `tools/verify-instanced.mjs --party-mods <Parties client jars>` for the complete 28-scenario suite (windows by default, `--headless` for development). It groups roles and languages and retains dated reports. See `scenarios/instanced/README.md` for preparation, required jars, retained construction fixtures and the verification record. Prefer widget labels over ordinal guesses when a custom screen registers fields from hidden tabs.
