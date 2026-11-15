@@ -19,6 +19,7 @@ public final class PlayerModule implements StageModule {
     public void install(LuaTable stage, ScriptContext context) {
         stage.set("player", function(a -> context.onClientGet(() -> player(context.client()))));
         stage.set("inventory", function(a -> context.onClientGet(() -> inventory(context.client()))));
+        stage.set("target", function(a -> context.onClientGet(() -> LuaValue.valueOf(describe(context.client().crosshairTarget)))));
         stage.set("use", function(a -> {
             context.onClient(() -> use(context.client()));
             return LuaValue.NIL;
