@@ -4,17 +4,29 @@ import me.arycer.stagecraft.script.ScriptContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.hit.HitResult;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 
 import static me.arycer.stagecraft.script.api.StageModule.function;
 
-/** {@code player}, {@code inventory} and {@code fly}. */
+/** {@code player}, {@code inventory}, {@code fly}, {@code use} and {@code attack}. */
 public final class PlayerModule implements StageModule {
     @Override
     public void install(LuaTable stage, ScriptContext context) {
         stage.set("player", function(a -> context.onClientGet(() -> player(context.client()))));
         stage.set("inventory", function(a -> context.onClientGet(() -> inventory(context.client()))));
+        stage.set("use", function(a -> {
+            context.onClient(() -> use(context.client()));
+            return LuaValue.NIL;
+        }));
+        stage.set("attack", function(a -> {
+            context.onClient(() -> attack(context.client()));
+            return LuaValue.NIL;
+        }));
         stage.set("fly", function(a -> {
             boolean flying = a.optboolean(1, true);
             context.onClient(() -> {
@@ -25,6 +37,51 @@ public final class PlayerModule implements StageModule {
             });
             return LuaValue.NIL;
         }));
+    }
+
+    /** Right-click in the world with the main hand: entity, block, then item use (like {@code doItemUse}). */
+    private static void use(MinecraftClient client) {
+        var player = client.player;
+        if (player == null || client.interactionManager == null) throw new IllegalStateException("Not connected");
+        HitResult hit = client.crosshairTarget;
+        if (hit instanceof EntityHitResult entityHit) {
+            var result = client.interactionManager.interactEntityAtLocation(player, entityHit.getEntity(), entityHit, Hand.MAIN_HAND);
+            if (!result.isAccepted()) result = client.interactionManager.interactEntity(player, entityHit.getEntity(), Hand.MAIN_HAND);
+            if (result.isAccepted()) {
+                if (result.shouldSwingHand()) player.swingHand(Hand.MAIN_HAND);
+                return;
+            }
+        }
+        if (hit instanceof BlockHitResult blockHit) {
+            var result = client.interactionManager.interactBlock(player, Hand.MAIN_HAND, blockHit);
+            if (result.isAccepted()) {
+                if (result.shouldSwingHand()) player.swingHand(Hand.MAIN_HAND);
+                return;
+            }
+        }
+        var result = client.interactionManager.interactItem(player, Hand.MAIN_HAND);
+        if (!result.isAccepted()) throw new IllegalStateException("Nothing was used (crosshair=" + describe(hit) + ")");
+        if (result.shouldSwingHand()) player.swingHand(Hand.MAIN_HAND);
+    }
+
+    /** Left-click attack on the entity under the crosshair (like {@code doAttack}). */
+    private static void attack(MinecraftClient client) {
+        var player = client.player;
+        if (player == null || client.interactionManager == null) throw new IllegalStateException("Not connected");
+        if (client.crosshairTarget instanceof EntityHitResult entityHit) {
+            client.interactionManager.attackEntity(player, entityHit.getEntity());
+            player.swingHand(Hand.MAIN_HAND);
+        } else {
+            throw new IllegalStateException("No entity under the crosshair (crosshair=" + describe(client.crosshairTarget) + ")");
+        }
+    }
+
+    private static String describe(HitResult hit) {
+        if (hit == null) return "null";
+        if (hit.getType() == HitResult.Type.MISS) return "MISS at " + hit.getPos().toString();
+        if (hit instanceof EntityHitResult entityHit) return "entity " + entityHit.getEntity().getName().getString();
+        if (hit instanceof BlockHitResult blockHit) return "block " + blockHit.getBlockPos().toShortString() + " " + blockHit.getSide();
+        return hit.getType().name();
     }
 
     private static LuaValue player(MinecraftClient client) {

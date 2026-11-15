@@ -50,6 +50,8 @@ that matches moves the cursor past what it matched.
 | `stage.player()` | `{name, x, y, z, yaw, pitch, dimension, gamemode, health, food, flying, on_ground, selected_slot}` |
 | `stage.inventory()` | `{ {slot, id, count}, … }` non-empty slots (vanilla indices) |
 | `stage.fly(bool=true)` | Toggle flying (the server must allow it: creative/spectator) |
+| `stage.use()` | Right-click in the world with the main hand: entity interact (at location, then plain), block use, then item use — like `doItemUse`. Errors when nothing is used |
+| `stage.attack()` | Left-click the entity under the crosshair — like `doAttack`. Errors when the crosshair is not on an entity |
 
 ## Screens (GUI)
 
