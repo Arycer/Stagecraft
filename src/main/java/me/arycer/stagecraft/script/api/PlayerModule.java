@@ -1,13 +1,17 @@
 package me.arycer.stagecraft.script.api;
 
 import me.arycer.stagecraft.script.ScriptContext;
+import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
 import net.minecraft.registry.Registries;
+import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.Vec3d;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
 
@@ -46,6 +50,17 @@ public final class PlayerModule implements StageModule {
         if (player == null || client.interactionManager == null) throw new IllegalStateException("Not connected");
         HitResult hit = client.crosshairTarget;
         if (hit instanceof EntityHitResult entityHit) {
+            // Fabric fires UseEntityCallback from MinecraftClient.doItemUse, before the interaction manager; mods
+            // that open a screen on right-click (quest givers, shops) listen there, so it is fired here too.
+            var callback = UseEntityCallback.EVENT.invoker().interact(player, player.getWorld(), Hand.MAIN_HAND, entityHit.getEntity(), entityHit);
+            if (callback != ActionResult.PASS) {
+                if (callback.isAccepted() && client.getNetworkHandler() != null) {
+                    Vec3d offset = entityHit.getPos().subtract(entityHit.getEntity().getPos());
+                    client.getNetworkHandler().sendPacket(PlayerInteractEntityC2SPacket.interactAt(entityHit.getEntity(), player.isSneaking(), Hand.MAIN_HAND, offset));
+                }
+                if (callback.shouldSwingHand()) player.swingHand(Hand.MAIN_HAND);
+                return;
+            }
             var result = client.interactionManager.interactEntityAtLocation(player, entityHit.getEntity(), entityHit, Hand.MAIN_HAND);
             if (!result.isAccepted()) result = client.interactionManager.interactEntity(player, entityHit.getEntity(), Hand.MAIN_HAND);
             if (result.isAccepted()) {
