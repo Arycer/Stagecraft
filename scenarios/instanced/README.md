@@ -1,6 +1,6 @@
 # Escenarios de Instanced en Stagecraft
 
-28 escenarios de Instanced, incluidos los migrados de `Documents/mc-test-tools/mc-headless` a Lua, con clientes reales. Verificados con ventanas visibles (26 escenarios, 32 ejecuciones de cliente, 138 pasos aprobados): [handoff-port-scenarios.md](../../docs/handoff-port-scenarios.md). La batería completa incluye también `settings-reset.lua` y `marker-portals.lua`, de ajustes y portales internos.
+29 escenarios de Instanced, incluidos los migrados de `Documents/mc-test-tools/mc-headless` a Lua, con clientes reales. Verificados con ventanas visibles (26 escenarios, 32 ejecuciones de cliente, 138 pasos aprobados): [handoff-port-scenarios.md](../../docs/handoff-port-scenarios.md). La batería completa incluye también `settings-reset.lua` y `marker-portals.lua`, de ajustes y portales internos, y `finder.lua`, del buscador de grupos (verificado sin ventana con dos clientes; no necesita el mod de cliente de Parties).
 
 ## Ejecutar la suite
 
@@ -55,6 +55,7 @@ Los originales llevan prefijo `instanced.` y sufijo `.e2e.mjs`, salvo los constr
 | `tpa` | A, B | TPA, TPHere y homes bloqueados al cruzar límites de instancia |
 | `rejoin` | A, B | Liberar la instancia de A desconectado, reconectar y volver a entrar |
 | `numismatic-parties` | A, B | Invitación, aceptación, chat, HUD y disolución reservada al líder |
+| `finder` | A, B | Roca de encuentro: abrir el buscador, inscribirse con nota, invitar y aceptar (se forma el grupo), grupo lleno, jugando con cronómetro y salida del buscador al alejarse |
 | `parties` | A, B, C, D | Herencia de instancia solo→grupo, cuatro dentro y expulsión tras la gracia |
 
 ## Helpers y limpieza

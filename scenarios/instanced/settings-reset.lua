@@ -25,7 +25,7 @@ local ok,failure=pcall(function()
     stage.host('file.write',{path=global,text=text}); I.reload()
   end)
   stage.step('abrir ajustes',function()
-    stage.command('gamemode creative'); I.cleanup(); G.admin(); G.tab(7); stage.wait_text('^Instancias por hora$')
+    stage.command('gamemode creative'); I.cleanup(); G.admin(); G.tab(8); stage.wait_text('^Instancias por hora$')
     G.field('37'); G.field('1.5 70.0 2.5')
   end)
   local untouched

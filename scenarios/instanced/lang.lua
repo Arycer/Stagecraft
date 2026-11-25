@@ -10,9 +10,9 @@ end
 local blocks={'room_zone','anchor','marker','start_point','capture','exit_portal','entrance_portal','marker_portal'}
 local ok,failure=pcall(function()
   stage.command('gamemode creative'); I.tp_to('minecraft:overworld',0.5,101,-5.5); stage.fly(true)
-  stage.step('admin: las siete pestañas en inglés',function()
+  stage.step('admin: las ocho pestañas en inglés',function()
     G.admin(); stage.wait_text('^Instanced · Administration$')
-    for tab=1,7 do G.tab(tab); stage.wait(0.5); collect('admin '..tab) end
+    for tab=1,8 do G.tab(tab); stage.wait(0.5); collect('admin '..tab) end
     G.tab(1); stage.click_text('^New level$'); stage.wait_text('^Form$'); collect('level form')
     stage.click_text('^Post-processing$'); stage.wait_text('^Remove markers$'); collect('postprocess'); stage.close()
   end)

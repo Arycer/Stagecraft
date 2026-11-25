@@ -27,7 +27,7 @@ local ok,failure=pcall(function()
   end)
 
   stage.step('ajustes: filas de limpieza',function()
-    G.tab(7); stage.wait_text('^Instancias por hora$')
+    G.tab(8); stage.wait_text('^Instancias por hora$')
     local save=stage.wait_text('^Guardar y aplicar$')
     for _,label in ipairs({'^Restaurar bloques/tick$','^Restaurar ms/tick$','^Bloques registrados máx\\.$',
                            '^Prioridad restaurar$','^Prioridad regenerar$'}) do

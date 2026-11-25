@@ -23,7 +23,7 @@ end
 function G.tab(index)
   local title=stage.wait_text('^Instanced · Administra')
   local scale=title.h/9
-  stage.click(title.x+(17-194+(index-1)*26)*scale,title.y+4*scale)
+  stage.click(title.x+(17-220+(index-1)*26)*scale,title.y+4*scale)
 end
 function G.open(at)
   stage.command('instanced marker edit '..at); stage.wait_screen('DesignEditorScreen',10)

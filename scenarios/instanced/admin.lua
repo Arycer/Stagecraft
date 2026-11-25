@@ -53,7 +53,7 @@ local ok,failure=pcall(function()
     I.wait_dimension('instanced:level/'..ns..'/gui'); stage.wait(1); assert(#I.ids(level)==1); I.cleanup()
   end)
   stage.step('ajustes: guardar configuración global',function()
-    G.admin(); G.tab(7); stage.wait_text('^Instancias por hora$')
+    G.admin(); G.tab(8); stage.wait_text('^Instancias por hora$')
     stage.set_field(G.field(tostring(cap)),tostring(cap+7)); stage.click_text('^Guardar y aplicar$'); stage.wait_text('^Configuración guardada\\.')
     local text=stage.host('file.read',{path=global}).text
     assert(tonumber(text:match('"instances_per_hour"%s*:%s*(%d+)'))==cap+7,'config no guardada')
