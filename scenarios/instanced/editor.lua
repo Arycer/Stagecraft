@@ -22,11 +22,11 @@ local ok,failure=pcall(function()
     stage.command('fill 0 120 -3 0 121 -3 minecraft:air')
     stage.command('fill 0 120 -3 0 121 -3 instanced:entrance_portal[facing=north]')
     G.open('0 120 -3'); stage.wait_text('^Portal de entrada$'); stage.wait_text([[^2 bloque\(s\) conectados]])
-    stage.click_text('^Este$'); stage.click_text('^Elegir color…$'); stage.wait_text('^Elegir color$')
-    stage.wait_text('^#[0-9A-F]{6}$'); stage.click_text('^Aceptar$')
+    stage.click_text('^Este$'); stage.click_text('^Superficie$'); stage.wait_text('^Color del portal$')
     local hex
     for n,w in ipairs(G.fields()) do if w.value:match('^%x%x%x%x%x%x$') then hex=n end end
     stage.set_field(assert(hex,'sin campo de color'),'3DDC84')
+    stage.click_text('^Destino$'); stage.wait_text('^Nivel del portal$')
     stage.click_text('^Lista…$'); stage.click_text('^demo:showcase$'); stage.click_text('^Usar mi posición$'); stage.click_text('^Guardar cambios$')
     for _,y in ipairs({120,121}) do
       local at='0 '..y..' -3'; G.block(at,'instanced:entrance_portal[facing=east]'); G.nbt(at,'Color',': 4054148'); G.nbt(at,'Level','"demo:showcase"')
