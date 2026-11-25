@@ -71,6 +71,8 @@ end
 local function world(text) stage.command('execute in '..origin.dimension..' run '..place(adapt(text))) end
 local function command(text) stage.command(adapt(text)) end
 local function poll(text, pattern, seconds)
+    -- The level runs under this run's own id: what the server answers names it, not demo:fortress.
+    pattern = adapt(pattern)
     for i = 1, seconds do
         command(text)
         if pcall(stage.expect_chat, pattern, 1) then return end
