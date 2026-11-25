@@ -1,6 +1,6 @@
 # Escenarios de Instanced en Stagecraft
 
-30 escenarios de Instanced, incluidos los migrados de `Documents/mc-test-tools/mc-headless` a Lua, con clientes reales. Verificados con ventanas visibles (26 escenarios, 32 ejecuciones de cliente, 138 pasos aprobados): [handoff-port-scenarios.md](../../docs/handoff-port-scenarios.md). La batería completa incluye también `settings-reset.lua` y `marker-portals.lua`, de ajustes y portales internos, y `finder.lua`, del buscador de grupos (verificado sin ventana con dos clientes; no necesita el mod de cliente de Parties).
+31 escenarios de Instanced, incluidos los migrados de `Documents/mc-test-tools/mc-headless` a Lua, con clientes reales. Verificados con ventanas visibles (26 escenarios, 32 ejecuciones de cliente, 138 pasos aprobados): [handoff-port-scenarios.md](../../docs/handoff-port-scenarios.md). La batería completa incluye también `settings-reset.lua` y `marker-portals.lua`, de ajustes y portales internos, y `finder.lua`, del buscador de grupos (verificado sin ventana con dos clientes; no necesita el mod de cliente de Parties).
 
 ## Ejecutar la suite
 
@@ -59,6 +59,7 @@ Los originales llevan prefijo `instanced.` y sufijo `.e2e.mjs`, salvo los constr
 | `numismatic-parties` | A, B | Invitación, aceptación, chat, HUD y disolución reservada al líder |
 | `finder` | A, B | Roca de encuentro: abrir el buscador, inscribirse con nota, invitar y aceptar (se forma el grupo), grupo lleno, jugando con cronómetro y salida del buscador al alejarse |
 | `finder-extras` | A, B | Buscador: cambiar la nota sin salir, responder una invitación desde el chat (`/finder accept`), grupo abierto al que se entra directamente; pantalla de grupo de Parties (tecla I): invitar completando el nombre con las sugerencias |
+| `parties-lang` | A (en inglés) | Numismatic Parties en inglés: un mensaje del servidor y la pantalla de grupo (tecla I) salen traducidos, sin texto en español |
 | `parties` | A, B, C, D | Herencia de instancia solo→grupo, cuatro dentro y expulsión tras la gracia |
 
 ## Helpers y limpieza
