@@ -368,6 +368,8 @@ export class DirectorSession {
         const stopped = await Promise.allSettled(Object.values(this.servers)
             .filter(server => server.owned && server.config.stopOnClose).map(server => server.stop()));
         for (const result of stopped) if (result.status === 'rejected') errors.push(result.reason);
+        // A server this session (re)started and leaves running must not keep the director's process alive.
+        for (const server of Object.values(this.servers)) if (server.owned && !server.config.stopOnClose) server.release();
         const clients = await Promise.allSettled(Object.values(this.clients).map(client =>
             client.stop({ park: this.config.legacy })));
         for (const result of clients) if (result.status === 'rejected') errors.push(result.reason);

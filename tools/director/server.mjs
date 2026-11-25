@@ -140,6 +140,12 @@ export class ServerController {
         catch { return false; }
     }
 
+    /** Lets go of a server that stays running after the session: its wrapper no longer holds this process open. */
+    release() {
+        this.child?.stdin?.destroy();
+        this.child?.unref();
+    }
+
     async finishWrapper() {
         if (!this.child || this.child.exitCode !== null) return;
         await Promise.race([
