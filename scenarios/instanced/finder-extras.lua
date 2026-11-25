@@ -1,7 +1,7 @@
 -- roles: A,B. The rest of the group finder (Instanced docs/design.md §4.13) and the group screen of Numismatic
 -- Parties, with two real clients: editing the note without leaving, answering an invitation from the chat
--- (/finder accept), an open group that is joined at once, and inviting from the group screen (key I) with the
--- name completed by the suggestions.
+-- (/finder accept), an open group that is joined at once, the stone's editor (shift + click), and the group screen
+-- (key I): its invitation preference and inviting with the name completed by the suggestions.
 -- Needs Numismatic Parties on the server and its client part on the clients (Instanced's collectHeadlessMods).
 local I=require('instanced')
 local role=stage.role
@@ -55,6 +55,33 @@ local ok,failure=pcall(function()
       I.cleanup()
       stage.wait_signal('stone',1,120)
     end
+  end)
+
+  stage.step('editor de la roca: shift + clic de un admin en creativo la gira',function()
+    if role~='A' then return end
+    local function yaw()
+      stage.command('execute in minecraft:overworld positioned '..STONE..' run data get entity @e[type=instanced:meeting_stone,limit=1,sort=nearest] Rotation[0]')
+      return tonumber(stage.expect_chat([[-?\d+\.?\d*f]],10):match('(-?%d+%.?%d*)f'))
+    end
+    local before=yaw()
+    stage.command('gamemode creative')
+    I.tp('execute in minecraft:overworld run tp @s -0.5 100 -3.5 facing 0.5 100 -5.5')
+    stage.wait(0.6)
+    stage.sneak(true); stage.wait(0.5)
+    stage.use()
+    stage.wait_text('^Roca de encuentro$',10)
+    stage.sneak(false)
+    stage.wait_text('^Nivel de la roca$',5)
+    stage.click_text('^45° ⟳$')
+    stage.click_text('^Guardar cambios$')
+    stage.wait_no_screen(5)
+    stage.wait(1)
+    local after=yaw()
+    assert(math.abs(((after-before+540)%360)-180-45)<1,'la roca no ha girado 45 grados: '..before..' -> '..after)
+    -- Without sneaking, the same click opens the finder.
+    stage.use()
+    stage.wait_text('^Buscador de grupos$',10)
+    stage.close()
   end)
 
   stage.step('A se inscribe y cambia la nota sin salir del buscador',function()
@@ -122,6 +149,12 @@ local ok,failure=pcall(function()
       stage.key('i')
       stage.wait_text('^Miembros$',10)
       stage.wait_text('^Preferencias$',5)
+      -- Without Friends on the server the preference is still there, with the options that need no other module.
+      stage.wait_text('^Todos$',5)
+      stage.click_text('^Quién puede invitarte$')
+      stage.wait_text('^Nadie$',10)
+      stage.click_text('^Quién puede invitarte$')
+      stage.wait_text('^Todos$',10)
       local field=stage.wait_text('^Nombre del jugador$',5)
       stage.click(field.cx,field.cy)
       -- Both test names start the same: what is left to complete is the last letter of the other one.

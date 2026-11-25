@@ -32,6 +32,13 @@ public final class PlayerModule implements StageModule {
             context.onClient(() -> attack(context.client()));
             return LuaValue.NIL;
         }));
+        stage.set("sneak", function(a -> {
+            boolean sneaking = a.optboolean(1, true);
+            // The sneak key itself: the player's input reads it every tick and tells the server. Opening a screen
+            // releases every key, like the real keyboard.
+            context.onClient(() -> context.client().options.sneakKey.setPressed(sneaking));
+            return LuaValue.NIL;
+        }));
         stage.set("fly", function(a -> {
             boolean flying = a.optboolean(1, true);
             context.onClient(() -> {

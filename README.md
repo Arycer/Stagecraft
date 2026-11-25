@@ -42,6 +42,7 @@ Para fortress, sitúate sobre el suelo y mira hacia la zona de construcción. El
 | `stage.assert_block(x,y,z,id)` | Comprueba un bloque por desplazamiento respecto al origen; exige chunk cargado en el cliente. |
 | `stage.assert_empty(x1,y1,z1,x2,y2,z2)` | Comprueba una caja vacía y cargada, máximo 100000 bloques. Es una comprobación previa, no un bloqueo frente a ediciones simultáneas de otros jugadores. |
 | `stage.fly(true/false)` | Activa/desactiva vuelo si el servidor ya lo permite. |
+| `stage.sneak(true/false)` | Mantiene o suelta la tecla de agacharse (para shift + clic con `stage.use()`). Abrir una pantalla la suelta. |
 | `stage.log(texto)` | Progreso en chat, consola e informe. |
 | `stage.origin` | Posición, dimensión y orientación guardadas: `x`, `y`, `z`, `dimension`, `yaw`, `pitch`. |
 | `stage.run_id` | Identificador único de la ejecución para generar rutas e IDs. |
