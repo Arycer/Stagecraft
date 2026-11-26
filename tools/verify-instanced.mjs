@@ -9,7 +9,7 @@ import { director } from './director.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const groups = [
-    { name: 'single', roles: ['A'], lang: 'es_es', scenarios: ['smoke','config','samples','demo','showcase','fortress','teleports','return','waiting','instances','restart','dimensions','slots','hud','tracker','capture','place','editor','convert','postprocess','admin','settings-reset','marker-portals'] },
+    { name: 'single', roles: ['A'], lang: 'es_es', scenarios: ['smoke','config','samples','demo','showcase','fortress','teleports','return','waiting','instances','restart','dimensions','slots','hud','tracker','capture','selection','place','editor','convert','postprocess','zones-biomes','admin','settings-reset','marker-portals'] },
     { name: 'english', roles: ['A'], lang: 'en_us', scenarios: ['lang','parties-lang'] },
     { name: 'duo', roles: ['A','B'], lang: 'es_es', parties: true, scenarios: ['tpa','rejoin','numismatic-parties','finder','finder-extras'] },
     { name: 'party', roles: ['A','B','C','D'], lang: 'es_es', parties: true, scenarios: ['parties'] },

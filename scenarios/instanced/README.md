@@ -1,6 +1,6 @@
 # Escenarios de Instanced en Stagecraft
 
-31 escenarios de Instanced, incluidos los migrados de `Documents/mc-test-tools/mc-headless` a Lua, con clientes reales. Verificados con ventanas visibles (26 escenarios, 32 ejecuciones de cliente, 138 pasos aprobados): [handoff-port-scenarios.md](../../docs/handoff-port-scenarios.md). La batería completa incluye también `settings-reset.lua` y `marker-portals.lua`, de ajustes y portales internos, y `finder.lua`, del buscador de grupos (verificado sin ventana con dos clientes; no necesita el mod de cliente de Parties).
+34 escenarios de Instanced, incluidos los migrados de `Documents/mc-test-tools/mc-headless` a Lua, con clientes reales. Verificados con ventanas visibles (26 escenarios, 32 ejecuciones de cliente, 138 pasos aprobados): [handoff-port-scenarios.md](../../docs/handoff-port-scenarios.md). La batería completa incluye también `settings-reset.lua` y `marker-portals.lua`, de ajustes y portales internos, y `finder.lua`, del buscador de grupos (verificado sin ventana con dos clientes; no necesita el mod de cliente de Parties).
 
 ## Ejecutar la suite
 
@@ -34,6 +34,7 @@ Los originales llevan prefijo `instanced.` y sufijo `.e2e.mjs`, salvo los constr
 | `demo` | A | Fixture de cripta y dimensión cargada |
 | `showcase` | A | Capturas, pools, nivel, slot y portal de la sala de muestra |
 | `fortress` | A | Fortaleza, 13 assets, 6 pools y 3 slots con recursión |
+| `islas` | A | Constructor que se conserva, como `fortress`: mazmorra del End en x 30000 y 100 z 30000 (schematic 88×36×24 con zonas de isla y del dragón; 10 templates a la vista con su captura y cartel: islas, base, 3 tramos, tope y 2 flotantes); torres que apilan pisos fuera de su template con pool `final`, flotantes laterales y biomas del End por zona; nivel `islas:end` con 3 slots y portal de entrada. Se reconstruye en cada ejecución |
 | `teleports` | A | 5 rondas de entrada/salida, slot tp y liberación forzada; log sin duplicados |
 | `return` | A | Ticket, misma instancia, reset, caducidad y límite horario |
 | `waiting` | A | Instancia en espera tras caducar el ticket y nueva entrada |
@@ -50,6 +51,8 @@ Los originales llevan prefijo `instanced.` y sufijo `.e2e.mjs`, salvo los constr
 | `portal-gallery` | A (ventana y Veil) | No comprueba nada: construye un portal por estilo, forma y opción y guarda capturas (F2) en `screenshots/` del cliente, para mirar los shaders. `--window-mods <carpeta con Veil>`; `keep=1` deja la galería |
 | `convert` | A | Conversión, confirmación de reemplazo, menú contextual y cofre conservado |
 | `postprocess` | A | Reparto, grupo añadido, selección de pool y JSON guardado |
+| `zones-biomes` | A | Torre con pisos fuera de su template y pool `final`; biomas del nivel y de zonas con bordes exactos en el servidor (`execute if biome`) y en el cliente (F3, también sin ventana); vaciar el slot devuelve `the_void` en vivo; campo Bioma del editor de zona con sugerencias. Namespace propio `sc_zb`, se borra al terminar |
+| `selection` | A | Selección pos1/pos2 (comando y vara con clic derecho), un bloque de captura colocado toma la caja; «Bloque en mano» en Ignorar y la captura `.schem` y `.nbt` sin el marco de diamante; «Ajustar al contenido» salta los ignorados; «Usar selección» en un bloque ya colocado |
 | `admin` | A | Subida local, carpetas, renombrado, pool, nivel, pregen, jugar, ajustes y borrado en uso |
 | `settings-reset` | A | Botón ↺ de cada ajuste global: restablece solo su campo y se guarda el predeterminado (sin `pos`) |
 | `cleanup` | A | «Al liberar» del editor escribe `session.cleanup`, filas de limpieza en ajustes, F8 cuenta y resalta los bloques cambiados, liberar los restaura y el historial lo muestra |
